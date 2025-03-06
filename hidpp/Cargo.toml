@@ -1,0 +1,9 @@
+[package]
+name = "hidpp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2"
+hidapi = "2.6.3"
+hidreport = "0.5.0"
