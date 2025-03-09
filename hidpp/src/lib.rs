@@ -1,5 +1,4 @@
-//! An implementation of Logitech's HID++ protocol with additional features to
-//! find and interact with HID++-capable devices.
+//! An implementation of Logitech's HID++ protocol.
 //!
 //! Many of Logitech's more modern peripheral devices (mice, keyboards etc.)
 //! support advanced features increasing the user experience. These include, but
@@ -17,4 +16,4 @@
 //! with a lot of documentation on HID++ and several device features. These
 //! documents were heavily used during the development of this crate.
 
-pub mod interface;
+pub mod channel;
