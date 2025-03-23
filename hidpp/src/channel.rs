@@ -1,8 +1,9 @@
-//! Implements messaging across a HID++ channel.
+//! Implements basic messaging across HID and HID++ channels.
 //!
 //! This includes mapping incoming messages to previously sent requests.
 
 use std::{
+    collections::VecDeque,
     error::Error,
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
@@ -237,7 +238,7 @@ pub struct HidppChannel<T: RawHidChannel> {
     raw_channel: Arc<T>,
 
     /// All sent messages that are waiting for a response.
-    pending_messages: Arc<Mutex<Vec<PendingMessage>>>,
+    pending_messages: Arc<Mutex<VecDeque<PendingMessage>>>,
 
     /// The sender signaling the read thread to stop.
     read_thread_close: Option<oneshot::Sender<()>>,
@@ -263,8 +264,15 @@ impl<T: RawHidChannel> Drop for HidppChannel<T> {
     }
 }
 
+/// Represents a message that was sent and is waiting for a response.
 struct PendingMessage {
+    /// The header of the sent message.
+    ///
+    /// This is used to match incoming messages,
     header: HidppMessageHeader,
+
+    /// The oneshot sender used to provide the response message to the receiving
+    /// end.
     sender: oneshot::Sender<HidppMessage>,
 }
 
@@ -281,7 +289,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
         }
 
         let raw_channel_rc = Arc::new(raw);
-        let pending_messages_rc = Arc::new(Mutex::new(Vec::<PendingMessage>::new()));
+        let pending_messages_rc = Arc::new(Mutex::new(VecDeque::<PendingMessage>::new()));
 
         let (close_sender, mut close_receiver) = oneshot::channel::<()>();
 
@@ -313,9 +321,9 @@ impl<T: RawHidChannel> HidppChannel<T> {
                             continue;
                         };
 
-                        if let Some(waiting) =
-                            guard.pop_if(|pending| pending.header == msg.header())
+                        if let Some(pos) = guard.iter().position(|elem| elem.header == msg.header())
                         {
+                            let waiting = guard.remove(pos).unwrap();
                             let _ = waiting.sender.send(msg);
                         }
                     }
@@ -356,10 +364,13 @@ impl<T: RawHidChannel> HidppChannel<T> {
 
         let (sender, receiver) = oneshot::channel::<HidppMessage>();
 
-        self.pending_messages.lock().unwrap().push(PendingMessage {
-            header: msg.header(),
-            sender,
-        });
+        self.pending_messages
+            .lock()
+            .unwrap()
+            .push_back(PendingMessage {
+                header: msg.header(),
+                sender,
+            });
 
         self.send_and_forget(msg).await?;
 
