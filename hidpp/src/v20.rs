@@ -1,6 +1,9 @@
 //! Implements functionality specific to HID++ version 2.0.
 
-use crate::channel::{HidppMessage, LONG_REPORT_LENGTH, SHORT_REPORT_LENGTH};
+use crate::{
+    channel::{HidppMessage, LONG_REPORT_LENGTH, SHORT_REPORT_LENGTH},
+    nibble::U4,
+};
 
 /// Represents the header that every [`HidppMessage`] of HID++ version 2.0
 /// starts with.
@@ -15,8 +18,11 @@ pub struct MessageHeader {
     /// feature enumeration request.
     pub feature_index: u8,
 
-    /// The function (leftmost 4 bits) and software (rightmost 4 bits) IDs.
-    pub function_and_sw_id: u8,
+    /// The ID of the function involved in the communication.
+    pub function_id: U4,
+
+    /// The ID of the software communicating with the device.
+    pub software_id: U4,
 }
 
 /// Represents a HID++ version 2.0 message.
@@ -39,14 +45,15 @@ impl Message {
     }
 }
 
-impl From<&HidppMessage> for Message {
-    fn from(msg: &HidppMessage) -> Self {
+impl From<HidppMessage> for Message {
+    fn from(msg: HidppMessage) -> Self {
         match msg {
             HidppMessage::Short(payload) => Message::Short(
                 MessageHeader {
                     device_index: payload[0],
                     feature_index: payload[1],
-                    function_and_sw_id: payload[2],
+                    function_id: U4::from_lo(payload[2]),
+                    software_id: U4::from_hi(payload[2]),
                 },
                 payload[3..].try_into().unwrap(),
             ),
@@ -54,7 +61,8 @@ impl From<&HidppMessage> for Message {
                 MessageHeader {
                     device_index: payload[0],
                     feature_index: payload[1],
-                    function_and_sw_id: payload[2],
+                    function_id: U4::from_lo(payload[2]),
+                    software_id: U4::from_hi(payload[2]),
                 },
                 payload[3..].try_into().unwrap(),
             ),
@@ -62,15 +70,15 @@ impl From<&HidppMessage> for Message {
     }
 }
 
-impl From<&Message> for HidppMessage {
-    fn from(msg: &Message) -> Self {
+impl From<Message> for HidppMessage {
+    fn from(msg: Message) -> Self {
         match msg {
             Message::Short(header, payload) => {
                 let mut data = [0u8; SHORT_REPORT_LENGTH - 1];
                 data[0] = header.device_index;
                 data[1] = header.feature_index;
-                data[2] = header.function_and_sw_id;
-                data[3..].copy_from_slice(payload);
+                data[2] = U4::combine(header.function_id, header.software_id);
+                data[3..].copy_from_slice(&payload);
 
                 HidppMessage::Short(data)
             },
@@ -78,8 +86,8 @@ impl From<&Message> for HidppMessage {
                 let mut data = [0u8; LONG_REPORT_LENGTH - 1];
                 data[0] = header.device_index;
                 data[1] = header.feature_index;
-                data[2] = header.function_and_sw_id;
-                data[3..].copy_from_slice(payload);
+                data[2] = U4::combine(header.function_id, header.software_id);
+                data[3..].copy_from_slice(&payload);
 
                 HidppMessage::Long(data)
             },

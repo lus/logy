@@ -17,4 +17,5 @@
 //! documents were heavily used during the development of this crate.
 
 pub mod channel;
+pub mod nibble;
 pub mod v20;
