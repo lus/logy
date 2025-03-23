@@ -22,15 +22,29 @@ const MAX_REPORT_DESCRIPTOR_LENGTH: usize = 4096;
 /// As we only care about HID++ reports, this equals to [`LONG_REPORT_LENGTH`].
 const MAX_REPORT_LENGTH: usize = LONG_REPORT_LENGTH;
 
-const SHORT_REPORT_ID: u8 = 0x10;
-const SHORT_REPORT_USAGE_PAGE: u16 = 0xff00;
-const SHORT_REPORT_USAGE: u16 = 0x0001;
-const SHORT_REPORT_LENGTH: usize = 7;
+/// The ID of the HID report that is used to transmit short HID++ messages.
+pub const SHORT_REPORT_ID: u8 = 0x10;
 
-const LONG_REPORT_ID: u8 = 0x11;
-const LONG_REPORT_USAGE_PAGE: u16 = 0xff00;
-const LONG_REPORT_USAGE: u16 = 0x0002;
-const LONG_REPORT_LENGTH: usize = 20;
+/// The HID usage page ID of short HID++ message reports.
+pub const SHORT_REPORT_USAGE_PAGE: u16 = 0xff00;
+
+/// The HID usage ID of short HID++ message reports.
+pub const SHORT_REPORT_USAGE: u16 = 0x0001;
+
+/// The length of short HID++ message reports (including report ID).
+pub const SHORT_REPORT_LENGTH: usize = 7;
+
+/// The ID of the HID report that is used to transmit long HID++ messages.
+pub const LONG_REPORT_ID: u8 = 0x11;
+
+/// The HID usage page ID of long HID++ message reports.
+pub const LONG_REPORT_USAGE_PAGE: u16 = 0xff00;
+
+/// The HID usage ID of long HID++ message reports.
+pub const LONG_REPORT_USAGE: u16 = 0x0002;
+
+/// The length of long HID++ message reports (including report ID).
+pub const LONG_REPORT_LENGTH: usize = 20;
 
 /// Represents an arbitrary HID communication channel that is both readable and
 /// writable. It has to support async I/O.
@@ -129,16 +143,16 @@ async fn supports_short_long_hidpp<T: RawHidChannel>(
     Ok((supports_short, supports_long))
 }
 
-/// Represents a HID++ message consisting of a header and payload.
+/// Represents an unversioned HID++ message.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum HidppMessage {
-    /// Represents a short HID++ message that has 3 bytes of payload.
+    /// Represents a short HID++ message.
     ///
     /// Please check [`HidppChannel::supports_short`] before sending this kind
     /// of message.
     Short([u8; SHORT_REPORT_LENGTH - 1]),
 
-    /// Represents a long HID++ message that has 16 bytes of payload.
+    /// Represents a long HID++ message.
     ///
     /// Please check [`HidppChannel::supports_long`] before sending this kind of
     /// message.
