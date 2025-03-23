@@ -129,22 +129,6 @@ async fn supports_short_long_hidpp<T: RawHidChannel>(
     Ok((supports_short, supports_long))
 }
 
-/// Represents the header that starts every HID++ message.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct HidppMessageHeader {
-    /// The index of the device involved in the communication.
-    pub device_index: u8,
-
-    /// The index of the feature the message belongs to.
-    ///
-    /// This is not the same as the feature ID, but the index returned from a
-    /// feature enumeration request.
-    pub feature_index: u8,
-
-    /// The function (leftmost 4 bits) and software (rightmost 4 bits) IDs.
-    pub function_and_sw_id: u8,
-}
-
 /// Represents a HID++ message consisting of a header and payload.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum HidppMessage {
@@ -152,13 +136,13 @@ pub enum HidppMessage {
     ///
     /// Please check [`HidppChannel::supports_short`] before sending this kind
     /// of message.
-    Short(HidppMessageHeader, [u8; SHORT_REPORT_LENGTH - 4]),
+    Short([u8; SHORT_REPORT_LENGTH - 1]),
 
     /// Represents a long HID++ message that has 16 bytes of payload.
     ///
     /// Please check [`HidppChannel::supports_long`] before sending this kind of
     /// message.
-    Long(HidppMessageHeader, [u8; LONG_REPORT_LENGTH - 4]),
+    Long([u8; LONG_REPORT_LENGTH - 1]),
 }
 
 impl HidppMessage {
@@ -168,24 +152,18 @@ impl HidppMessage {
             return None;
         }
 
-        let header = HidppMessageHeader {
-            device_index: data[1],
-            feature_index: data[2],
-            function_and_sw_id: data[3],
-        };
-
         if data[0] == SHORT_REPORT_ID {
             if data.len() != SHORT_REPORT_LENGTH {
                 return None;
             }
 
-            return Some(HidppMessage::Short(header, data[4..].try_into().unwrap()));
+            return Some(HidppMessage::Short(data[1..].try_into().unwrap()));
         } else if data[0] == LONG_REPORT_ID {
             if data.len() != LONG_REPORT_LENGTH {
                 return None;
             }
 
-            return Some(HidppMessage::Long(header, data[4..].try_into().unwrap()));
+            return Some(HidppMessage::Long(data[1..].try_into().unwrap()));
         }
 
         None
@@ -195,33 +173,17 @@ impl HidppMessage {
     ///
     /// Returns the amount of written bytes.
     pub fn write_raw(&self, buf: &mut [u8]) -> usize {
-        let (id, header) = match self {
-            Self::Short(header, _) => (SHORT_REPORT_ID, header),
-            Self::Long(header, _) => (LONG_REPORT_ID, header),
-        };
-
-        buf[0] = id;
-        buf[1] = header.device_index;
-        buf[2] = header.feature_index;
-        buf[3] = header.function_and_sw_id;
-
         match self {
-            Self::Short(_, payload) => {
-                buf[4..SHORT_REPORT_LENGTH].copy_from_slice(payload);
+            Self::Short(payload) => {
+                buf[0] = SHORT_REPORT_ID;
+                buf[1..SHORT_REPORT_LENGTH].copy_from_slice(payload);
                 SHORT_REPORT_LENGTH
             },
-            Self::Long(_, payload) => {
-                buf[4..LONG_REPORT_LENGTH].copy_from_slice(payload);
+            Self::Long(payload) => {
+                buf[0] = LONG_REPORT_ID;
+                buf[1..LONG_REPORT_LENGTH].copy_from_slice(payload);
                 LONG_REPORT_LENGTH
             },
-        }
-    }
-
-    /// Extracts the header of the HID++ message.
-    pub fn header(&self) -> HidppMessageHeader {
-        match *self {
-            Self::Short(header, _) => header,
-            Self::Long(header, _) => header,
         }
     }
 }
@@ -266,10 +228,9 @@ impl<T: RawHidChannel> Drop for HidppChannel<T> {
 
 /// Represents a message that was sent and is waiting for a response.
 struct PendingMessage {
-    /// The header of the sent message.
-    ///
-    /// This is used to match incoming messages,
-    header: HidppMessageHeader,
+    /// The predicate that has to match for an incoming message to be classified
+    /// as the response.
+    response_predicate: Box<dyn Fn(&HidppMessage) -> bool + Send>,
 
     /// The oneshot sender used to provide the response message to the receiving
     /// end.
@@ -321,7 +282,9 @@ impl<T: RawHidChannel> HidppChannel<T> {
                             continue;
                         };
 
-                        if let Some(pos) = guard.iter().position(|elem| elem.header == msg.header())
+                        if let Some(pos) = guard
+                            .iter()
+                            .position(|elem| (elem.response_predicate)(&msg))
                         {
                             let waiting = guard.remove(pos).unwrap();
                             let _ = waiting.sender.send(msg);
@@ -344,8 +307,8 @@ impl<T: RawHidChannel> HidppChannel<T> {
     /// Checks whether the channel supports the given HID++ message.
     pub fn supports_msg(&self, msg: &HidppMessage) -> bool {
         match msg {
-            HidppMessage::Short(..) => self.supports_short,
-            HidppMessage::Long(..) => self.supports_long,
+            HidppMessage::Short(_) => self.supports_short,
+            HidppMessage::Long(_) => self.supports_long,
         }
     }
 
@@ -357,6 +320,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
     pub async fn send(
         &self,
         msg: HidppMessage,
+        response_predicate: impl Fn(&HidppMessage) -> bool + Send + 'static,
     ) -> Result<Option<HidppMessage>, ChannelError<T::Error>> {
         if !self.supports_msg(&msg) {
             return Err(ChannelError::MessageTypeNotSupported);
@@ -368,7 +332,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
             .lock()
             .unwrap()
             .push_back(PendingMessage {
-                header: msg.header(),
+                response_predicate: Box::new(response_predicate),
                 sender,
             });
 
