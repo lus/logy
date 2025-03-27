@@ -5,13 +5,19 @@
 use std::{
     collections::VecDeque,
     error::Error,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc,
+        Mutex,
+        atomic::{AtomicBool, AtomicU8, Ordering},
+    },
     thread::{self, JoinHandle},
 };
 
 use futures::{FutureExt, channel::oneshot, select};
 use hidreport::{Field, Report, ReportDescriptor, Usage, UsageId, UsagePage};
 use thiserror::Error;
+
+use crate::nibble::U4;
 
 /// hidapi defines this as the maximum EXPECTED size of report descriptors.
 /// We will trust this for now, but a workaround may be required if devices do
@@ -213,6 +219,12 @@ pub struct HidppChannel<T: RawHidChannel> {
     /// The underlying raw HID channel.
     raw_channel: Arc<T>,
 
+    /// Whether to rotate the [`Self::software_id`].
+    rotate_software_id: AtomicBool,
+
+    /// The software ID to provide at the next call to [`Self::get_sw_id`].
+    software_id: AtomicU8,
+
     /// All sent messages that are waiting for a response.
     pending_messages: Arc<Mutex<VecDeque<PendingMessage>>>,
 
@@ -312,10 +324,48 @@ impl<T: RawHidChannel> HidppChannel<T> {
             supports_short,
             supports_long,
             raw_channel: raw_channel_rc,
+            rotate_software_id: AtomicBool::new(false),
+            software_id: AtomicU8::new(0x00),
             pending_messages: pending_messages_rc,
             read_thread_close: Some(close_sender),
             read_thread_hdl: Some(read_thread_hdl),
         })
+    }
+
+    /// Sets the software ID that should be returned by the next call to
+    /// [`Self::get_sw_id`].
+    pub fn set_sw_id(&self, sw_id: U4) {
+        self.software_id.store(sw_id.to_lo(), Ordering::SeqCst);
+    }
+
+    /// Sets whether the software ID returned by a call to [`Self::get_sw_id`]
+    /// should increment (and potentially wrap around) after each call.
+    /// This comes in handy when trying to map responses to requests.
+    pub fn set_rotating_sw_id(&self, enable: bool) {
+        self.rotate_software_id.store(enable, Ordering::SeqCst);
+    }
+
+    /// Provides a software ID that can be used to send a HID++ message across
+    /// the channel.
+    ///
+    /// This method should be called separately for every message to send as it
+    /// may rotate (as indicated by [`Self::set_rotating_sw_id`]).
+    pub fn get_sw_id(&self) -> U4 {
+        if self.rotate_software_id.load(Ordering::SeqCst) {
+            U4::from_lo(
+                self.software_id
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old| {
+                        if old & 0x0f == 0x0f {
+                            Some(0x00)
+                        } else {
+                            Some((old + 1) & 0x0f)
+                        }
+                    })
+                    .unwrap(),
+            )
+        } else {
+            U4::from_lo(self.software_id.load(Ordering::SeqCst))
+        }
     }
 
     /// Checks whether the channel supports the given HID++ message.

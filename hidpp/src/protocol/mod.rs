@@ -47,7 +47,6 @@ pub enum ProtocolVersion {
 pub async fn determine_version<T: RawHidChannel>(
     chan: &HidppChannel<T>,
     device_index: u8,
-    software_id: U4,
 ) -> Result<ProtocolVersion, ProtocolError<T::Error>> {
     // To determine the protocol version, we send a HID++2.0 ping message
     // feature with index 0x00, function 0x01).
@@ -57,12 +56,13 @@ pub async fn determine_version<T: RawHidChannel>(
     // indicating 0x00 is no valid sub ID. We make use of this to pin them to
     // version 1.0.
 
+    let sw_id = chan.get_sw_id();
     let msg = v20::Message::Short(
         v20::MessageHeader {
             device_index,
             feature_index: 0x00,
             function_id: U4::from_lo(0x1),
-            software_id,
+            software_id: sw_id,
         },
         [0x00, 0x00, 0x00],
     );
@@ -82,7 +82,7 @@ pub async fn determine_version<T: RawHidChannel>(
                     // The feature index we sent would be interpreted as the sub ID by HID++1.0, which is included in the error message.
                     && payload[0] == 0x00
                     // The function & software IDs would be interpreted as the register address in HID++1.0.
-                    && payload[1] == nibble::combine(msg.header().function_id, software_id)
+                    && payload[1] == nibble::combine(msg.header().function_id, sw_id)
                 {
                     return true;
                 }
