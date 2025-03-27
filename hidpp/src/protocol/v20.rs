@@ -1,12 +1,11 @@
-//! Implements functionality specific to HID++ version 2.0.
+//! Implements functionality specific to HID++2.0.
 
 use crate::{
     channel::{HidppMessage, LONG_REPORT_LENGTH, SHORT_REPORT_LENGTH},
     nibble::{self, U4},
 };
 
-/// Represents the header that every [`HidppMessage`] of HID++ version 2.0
-/// starts with.
+/// Represents the header that every [`HidppMessage`] of HID++2.0 starts with.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct MessageHeader {
     /// The index of the device involved in the communication.
@@ -25,13 +24,13 @@ pub struct MessageHeader {
     pub software_id: U4,
 }
 
-/// Represents a HID++ version 2.0 message.
+/// Represents a HID++2.0 message.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Message {
-    /// Represents a short HID++ version 2.0 message with 3 bytes of payload.
+    /// Represents a short HID++2.0 message with 3 bytes of payload.
     Short(MessageHeader, [u8; SHORT_REPORT_LENGTH - 4]),
 
-    /// Represents a long HID++ version 2.0 message with 16 bytes of payload.
+    /// Represents a long HID++2.0 message with 16 bytes of payload.
     Long(MessageHeader, [u8; LONG_REPORT_LENGTH - 4]),
 }
 
@@ -43,6 +42,20 @@ impl Message {
             Message::Long(header, _) => header,
         }
     }
+
+    /// Extracts the payload of the message and fits it into an array capable of
+    /// containing the longest possible payload, filling the rest up with
+    /// zeroes.
+    pub fn extend_payload(&self) -> [u8; LONG_REPORT_LENGTH - 4] {
+        match *self {
+            Message::Short(_, payload) => {
+                let mut data = [0; LONG_REPORT_LENGTH - 4];
+                data[..SHORT_REPORT_LENGTH - 4].copy_from_slice(&payload);
+                data
+            },
+            Message::Long(_, payload) => payload,
+        }
+    }
 }
 
 impl From<HidppMessage> for Message {
@@ -52,8 +65,8 @@ impl From<HidppMessage> for Message {
                 MessageHeader {
                     device_index: payload[0],
                     feature_index: payload[1],
-                    function_id: U4::from_lo(payload[2]),
-                    software_id: U4::from_hi(payload[2]),
+                    function_id: U4::from_hi(payload[2]),
+                    software_id: U4::from_lo(payload[2]),
                 },
                 payload[3..].try_into().unwrap(),
             ),
@@ -61,8 +74,8 @@ impl From<HidppMessage> for Message {
                 MessageHeader {
                     device_index: payload[0],
                     feature_index: payload[1],
-                    function_id: U4::from_lo(payload[2]),
-                    software_id: U4::from_hi(payload[2]),
+                    function_id: U4::from_hi(payload[2]),
+                    software_id: U4::from_lo(payload[2]),
                 },
                 payload[3..].try_into().unwrap(),
             ),

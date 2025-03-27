@@ -18,4 +18,4 @@
 
 pub mod channel;
 pub mod nibble;
-pub mod v20;
+pub mod protocol;
