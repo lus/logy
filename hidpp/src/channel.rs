@@ -340,7 +340,8 @@ impl<T: RawHidChannel> HidppChannel<T> {
 
     /// Sets whether the software ID returned by a call to [`Self::get_sw_id`]
     /// should increment (and potentially wrap around) after each call.
-    /// This comes in handy when trying to map responses to requests.
+    /// This comes in handy when trying to map responses to requests
+    /// consistently.
     pub fn set_rotating_sw_id(&self, enable: bool) {
         self.rotate_software_id.store(enable, Ordering::SeqCst);
     }

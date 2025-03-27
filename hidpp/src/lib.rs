@@ -17,5 +17,6 @@
 //! documents were heavily used during the development of this crate.
 
 pub mod channel;
+pub mod device;
 pub mod nibble;
 pub mod protocol;
