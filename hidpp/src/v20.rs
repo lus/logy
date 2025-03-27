@@ -2,7 +2,7 @@
 
 use crate::{
     channel::{HidppMessage, LONG_REPORT_LENGTH, SHORT_REPORT_LENGTH},
-    nibble::U4,
+    nibble::{self, U4},
 };
 
 /// Represents the header that every [`HidppMessage`] of HID++ version 2.0
@@ -77,7 +77,7 @@ impl From<Message> for HidppMessage {
                 let mut data = [0u8; SHORT_REPORT_LENGTH - 1];
                 data[0] = header.device_index;
                 data[1] = header.feature_index;
-                data[2] = U4::combine(header.function_id, header.software_id);
+                data[2] = nibble::combine(header.function_id, header.software_id);
                 data[3..].copy_from_slice(&payload);
 
                 HidppMessage::Short(data)
@@ -86,7 +86,7 @@ impl From<Message> for HidppMessage {
                 let mut data = [0u8; LONG_REPORT_LENGTH - 1];
                 data[0] = header.device_index;
                 data[1] = header.feature_index;
-                data[2] = U4::combine(header.function_id, header.software_id);
+                data[2] = nibble::combine(header.function_id, header.software_id);
                 data[3..].copy_from_slice(&payload);
 
                 HidppMessage::Long(data)

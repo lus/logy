@@ -24,10 +24,10 @@ impl U4 {
     pub fn to_hi(self) -> u8 {
         self.0 << 4
     }
+}
 
-    /// Combines to nibbles to a byte, with `a` being set to the 4 leftmost and
-    /// `b` being set to the 4 rightmost bits.
-    pub fn combine(a: U4, b: U4) -> u8 {
-        a.to_hi() | b.to_lo()
-    }
+/// Combines two nibbles to a byte, with `a` being set to the 4 leftmost and
+/// `b` being set to the 4 rightmost bits.
+pub fn combine(a: U4, b: U4) -> u8 {
+    a.to_hi() | b.to_lo()
 }
