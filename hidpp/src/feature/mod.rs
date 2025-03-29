@@ -4,6 +4,7 @@ use std::{any::Any, sync::Arc};
 
 use crate::channel::{HidppChannel, RawHidChannel};
 
+pub mod feature_set;
 pub mod root;
 
 /// Represents a concrete implementation of a HID++2.0 device feature.
