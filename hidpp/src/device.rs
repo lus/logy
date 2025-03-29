@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     channel::{ChannelError, HidppChannel, RawHidChannel},
-    feature::{Feature, root::RootFeature},
+    feature::{CreatableFeature, Feature, root::RootFeature},
     protocol::{self, ProtocolError, ProtocolVersion},
 };
 
@@ -63,7 +63,7 @@ impl<T: RawHidChannel> Device<T> {
 
         // Every HID++2.0 device supports the root feature.
         // We implicitly verified that using [`protocol::determine_version`].
-        device.add_feature(RootFeature::new(chan, device.device_index));
+        device.add_feature::<RootFeature<T>>(0);
 
         Ok(device)
     }
@@ -72,13 +72,29 @@ impl<T: RawHidChannel> Device<T> {
     /// This will override an existing implementation of the same type.
     /// The caller is responsible for making sure the device actually supports
     /// the feature.
-    pub fn add_feature<F: Feature<T>>(&mut self, feature: F) -> Arc<F> {
+    pub fn add_feature_instance<F: Feature<T>>(&mut self, feature: F) -> Arc<F> {
         let feat_rc: Arc<dyn Feature<T>> = Arc::new(feature);
 
         self.features
             .insert(TypeId::of::<F>(), Arc::clone(&feat_rc));
 
         Arc::downcast::<F>(feat_rc).unwrap()
+    }
+
+    /// Adds a new feature implementation to the list of available features.
+    /// This will override an existing implementation of the same type.
+    /// The caller is responsible for making sure the device actually supports
+    /// the feature.
+    ///
+    /// This method uses [`CreatableFeature`] to automatically create an
+    /// instance of the feature implementation and adds it using
+    /// [`Self::add_feature_instance`].
+    pub fn add_feature<F: CreatableFeature<T>>(&mut self, feature_index: u8) -> Arc<F> {
+        self.add_feature_instance(F::new(
+            Arc::clone(&self.chan),
+            self.device_index,
+            feature_index,
+        ))
     }
 
     /// Checks whether a specific feature implementation is provided by the

@@ -1,8 +1,8 @@
 //! Specific device feature implementations.
 
-use std::any::Any;
+use std::{any::Any, sync::Arc};
 
-use crate::channel::RawHidChannel;
+use crate::channel::{HidppChannel, RawHidChannel};
 
 pub mod root;
 
@@ -10,6 +10,12 @@ pub mod root;
 pub trait Feature<T: RawHidChannel>: Any + Send + Sync {
     /// Provides the protocol ID of the feature.
     fn id(&self) -> u16;
+}
+
+/// Represents a [`Feature`] that can be instantiated automatically.
+pub trait CreatableFeature<T: RawHidChannel>: Feature<T> {
+    /// Creates a new instance of the feature implementation.
+    fn new(chan: Arc<HidppChannel<T>>, device_index: u8, feature_index: u8) -> Self;
 }
 
 /// A bitfield describing some properties of a feature.

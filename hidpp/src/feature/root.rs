@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use super::{Feature, FeatureType};
+use super::{CreatableFeature, Feature, FeatureType};
 use crate::{
     channel::{ChannelError, HidppChannel, RawHidChannel},
     nibble::U4,
@@ -24,16 +24,23 @@ pub struct RootFeature<T: RawHidChannel> {
     device_index: u8,
 }
 
-impl<T: RawHidChannel> RootFeature<T> {
-    /// Creates a new instance of the root feature implementation for a specific
-    /// device index.
-    pub fn new(chan: Arc<HidppChannel<T>>, device_index: u8) -> Self {
+impl<T: RawHidChannel> CreatableFeature<T> for RootFeature<T> {
+    fn new(chan: Arc<HidppChannel<T>>, device_index: u8, _: u8) -> Self {
         Self {
             chan,
             device_index,
         }
     }
+}
 
+impl<T: RawHidChannel> Feature<T> for RootFeature<T> {
+    #[inline]
+    fn id(&self) -> u16 {
+        0x0000
+    }
+}
+
+impl<T: RawHidChannel> RootFeature<T> {
     /// Retrieves information about a specific feature ID, including its index
     /// in the feature table, its type and its version.
     ///
@@ -94,13 +101,6 @@ impl<T: RawHidChannel> RootFeature<T> {
 
         let payload = v20::Message::from(response).extend_payload();
         Ok(payload[2])
-    }
-}
-
-impl<T: RawHidChannel> Feature<T> for RootFeature<T> {
-    #[inline]
-    fn id(&self) -> u16 {
-        0x0000
     }
 }
 
