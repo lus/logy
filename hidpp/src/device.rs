@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     channel::{ChannelError, HidppChannel, RawHidChannel},
-    feature::{CreatableFeature, Feature, root::RootFeature},
+    feature::{self, CreatableFeature, Feature, root},
     protocol::{self, ProtocolVersion},
 };
 
@@ -55,7 +55,7 @@ impl<T: RawHidChannel> Device<T> {
         }
 
         let mut device = Self {
-            chan: Arc::clone(&chan),
+            chan,
             features: HashMap::new(),
             device_index,
             protocol_version: version,
@@ -63,7 +63,7 @@ impl<T: RawHidChannel> Device<T> {
 
         // Every HID++2.0 device supports the root feature.
         // We implicitly verified that using [`protocol::determine_version`].
-        device.add_feature::<RootFeature<T>>(0);
+        feature::add_implementation(&mut device, 0, root::FEATURE_ID, 0);
 
         Ok(device)
     }

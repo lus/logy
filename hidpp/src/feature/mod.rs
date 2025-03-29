@@ -2,16 +2,19 @@
 
 use std::{any::Any, sync::Arc};
 
-use crate::channel::{HidppChannel, RawHidChannel};
+use feature_set::v0::FeatureSetFeatureV0;
+use root::RootFeature;
+
+use crate::{
+    channel::{HidppChannel, RawHidChannel},
+    device::Device,
+};
 
 pub mod feature_set;
 pub mod root;
 
 /// Represents a concrete implementation of a HID++2.0 device feature.
-pub trait Feature<T: RawHidChannel>: Any + Send + Sync {
-    /// Provides the protocol ID of the feature.
-    fn id(&self) -> u16;
-}
+pub trait Feature<T: RawHidChannel>: Any + Send + Sync {}
 
 /// Represents a [`Feature`] that can be instantiated automatically.
 pub trait CreatableFeature<T: RawHidChannel>: Feature<T> {
@@ -57,5 +60,33 @@ impl FeatureType {
             manufacturing_deactivatable: raw & (1 << 4) != 0,
             compliance_deactivatable: raw & (1 << 3) != 0,
         }
+    }
+}
+
+/// Adds a default feature implementation to a device based on its ID and
+/// version.
+///
+/// Returns whether an implementation exists and thus was added or not.
+///
+/// This does NOT check whether the device actually supports the feature.
+pub fn add_implementation<T: RawHidChannel>(
+    dev: &mut Device<T>,
+    feature_index: u8,
+    feature_id: u16,
+    feature_version: u8,
+) -> bool {
+    match feature_id {
+        root::FEATURE_ID => {
+            dev.add_feature::<RootFeature<T>>(feature_index);
+            true
+        },
+        feature_set::FEATURE_ID => match feature_version {
+            0..=2 => {
+                dev.add_feature::<FeatureSetFeatureV0<T>>(feature_index);
+                true
+            },
+            _ => false,
+        },
+        _ => false,
     }
 }

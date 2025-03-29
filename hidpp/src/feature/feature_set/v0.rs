@@ -42,10 +42,6 @@ impl<T: RawHidChannel> CreatableFeature<T> for FeatureSetFeatureV0<T> {
 }
 
 impl<T: RawHidChannel> Feature<T> for FeatureSetFeatureV0<T> {
-    #[inline]
-    fn id(&self) -> u16 {
-        0x0001
-    }
 }
 
 impl<T: RawHidChannel> FeatureSetFeatureV0<T> {
