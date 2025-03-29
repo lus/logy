@@ -153,7 +153,10 @@ impl MessageType {
 /// Error codes `0x0D..=0xFF` are defined as reserved values and are merged into
 /// the [`Self::Reserved`] variant.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Error {
+pub enum ErrorType {
+    /// No error.
+    Success = 0x00,
+
     /// The sub ID of a sent message is invalid.
     InvalidSubId = 0x01,
 
@@ -201,34 +204,29 @@ pub enum Error {
     Reserved,
 }
 
-impl Error {
-    /// Tries to construct an [`Error`] variant from the raw error code included
-    /// in a [`MessageType::Error`] message.
-    ///
-    /// Returns [`None`] if and only if the error code is `0x00`, which is
-    /// defined as success. All other possible [`u8`] values are defined in the
-    /// specification, with the range `0x0D..=0xFF` defined as
-    /// [`Self::Reserved`].
-    pub fn from_code(code: u8) -> Option<Self> {
+impl ErrorType {
+    /// Constructs an [`Error`] variant from the raw error code included in a
+    /// [`MessageType::Error`] message.
+    pub fn from_code(code: u8) -> Self {
         match code {
-            0x00 => None,
-            0x01 => Some(Self::InvalidSubId),
-            0x02 => Some(Self::InvalidAddress),
-            0x03 => Some(Self::InvalidValue),
-            0x04 => Some(Self::ConnectFail),
-            0x05 => Some(Self::TooManyDevices),
-            0x06 => Some(Self::AlreadyExists),
-            0x07 => Some(Self::Busy),
-            0x08 => Some(Self::UnknownDevice),
-            0x09 => Some(Self::ResourceError),
-            0x0a => Some(Self::RequestUnavailable),
-            0x0b => Some(Self::InvalidParamValue),
-            0x0c => Some(Self::WrongPinCode),
-            0x0d..=0xff => Some(Self::Reserved),
+            0x00 => Self::Success,
+            0x01 => Self::InvalidSubId,
+            0x02 => Self::InvalidAddress,
+            0x03 => Self::InvalidValue,
+            0x04 => Self::ConnectFail,
+            0x05 => Self::TooManyDevices,
+            0x06 => Self::AlreadyExists,
+            0x07 => Self::Busy,
+            0x08 => Self::UnknownDevice,
+            0x09 => Self::ResourceError,
+            0x0a => Self::RequestUnavailable,
+            0x0b => Self::InvalidParamValue,
+            0x0c => Self::WrongPinCode,
+            0x0d..=0xff => Self::Reserved,
         }
     }
 
-    /// Tries to construct the raw error code from a [`Error`] variant.
+    /// Tries to construct the raw error code from an [`Error`] variant.
     ///
     /// Returns [`None`] for [`Self::Reserved`], as no single error code is
     /// defined for this variant.

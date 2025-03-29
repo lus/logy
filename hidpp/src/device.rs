@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::{
     channel::{ChannelError, HidppChannel, RawHidChannel},
     feature::{CreatableFeature, Feature, root::RootFeature},
-    protocol::{self, ProtocolError, ProtocolVersion},
+    protocol::{self, ProtocolVersion},
 };
 
 /// Represents a single HID++ device connected to a [`HidppChannel`].
@@ -43,14 +43,14 @@ impl<T: RawHidChannel> Device<T> {
         chan: Arc<HidppChannel<T>>,
         device_index: u8,
     ) -> Result<Self, DeviceError<T::Error>> {
-        let protocol_version = protocol::determine_version(&*chan, device_index)
-            .await
-            .map_err(|err| match err {
-                ProtocolError::Channel(src) => DeviceError::Channel(src),
-                ProtocolError::DeviceNotFound => DeviceError::DeviceNotFound,
-            })?;
+        let protocol_version = protocol::determine_version(&*chan, device_index).await?;
 
-        if let ProtocolVersion::V10 = protocol_version {
+        if protocol_version.is_none() {
+            return Err(DeviceError::DeviceNotFound);
+        }
+        let version = protocol_version.unwrap();
+
+        if version == ProtocolVersion::V10 {
             return Err(DeviceError::UnsupportedProtocolVersion);
         }
 
@@ -58,7 +58,7 @@ impl<T: RawHidChannel> Device<T> {
             chan: Arc::clone(&chan),
             features: HashMap::new(),
             device_index,
-            protocol_version,
+            protocol_version: version,
         };
 
         // Every HID++2.0 device supports the root feature.

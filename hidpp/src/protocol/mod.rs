@@ -1,8 +1,6 @@
 //! Implements the protocol-specific parts of HID++.
 
-use std::{error::Error, fmt::Debug};
-
-use thiserror::Error;
+use std::fmt::Debug;
 
 use crate::{
     channel::{ChannelError, HidppChannel, RawHidChannel},
@@ -44,10 +42,12 @@ pub enum ProtocolVersion {
 }
 
 /// Tries to determine the protocol version of a specific device.
+///
+/// Returns `Ok(None)` if no device was found for the given device index.
 pub async fn determine_version<T: RawHidChannel>(
     chan: &HidppChannel<T>,
     device_index: u8,
-) -> Result<ProtocolVersion, ProtocolError<T::Error>> {
+) -> Result<Option<ProtocolVersion>, ChannelError<T::Error>> {
     // To determine the protocol version, we send a HID++2.0 ping message
     // feature with index 0x00, function 0x01).
     // Devices supporting protocol >=2.0 will respond with a defined response
@@ -95,31 +95,19 @@ pub async fn determine_version<T: RawHidChannel>(
     let v20_msg = v20::Message::from(response);
     if v20_msg.header() == msg.header() {
         let payload = v20_msg.extend_payload();
-        return Ok(ProtocolVersion::V20 {
+        return Ok(Some(ProtocolVersion::V20 {
             protocol_num: payload[0],
             target_sw: payload[1],
-        });
+        }));
     }
 
     let v10::Message::Short(_, payload) = v10::Message::from(response) else {
-        return Err(ProtocolError::DeviceNotFound);
+        return Ok(None);
     };
 
-    if payload[2] == v10::Error::InvalidSubId.to_code().unwrap() {
-        Ok(ProtocolVersion::V10)
+    if payload[2] == v10::ErrorType::InvalidSubId.to_code().unwrap() {
+        Ok(Some(ProtocolVersion::V10))
     } else {
-        Err(ProtocolError::DeviceNotFound)
+        Ok(None)
     }
-}
-
-/// Represents a protocol-specific error.
-#[derive(Debug, Error)]
-pub enum ProtocolError<T: Error> {
-    /// Indicates that the underlying [`HidppChannel`] returned an error.
-    #[error("the HID++ channel returned an error")]
-    Channel(#[from] ChannelError<T>),
-
-    /// Indicates that the specified device index points to no device.
-    #[error("there is no device with the specified device index")]
-    DeviceNotFound,
 }

@@ -1,16 +1,16 @@
-//! Implements the root feature (ID `0x0000`) that every device supports by
+//! Implements the Root feature (ID `0x0000`) that every device supports by
 //! default.
 
 use std::sync::Arc;
 
 use super::{CreatableFeature, Feature, FeatureType};
 use crate::{
-    channel::{ChannelError, HidppChannel, RawHidChannel},
+    channel::{HidppChannel, RawHidChannel},
     nibble::U4,
-    protocol::v20,
+    protocol::v20::{self, Hidpp20Error},
 };
 
-/// Implements the `IRoot` / `0x0000` feature that every HID++2.0 device
+/// Implements the `Root` / `0x0000` feature that every HID++2.0 device
 /// supports by default.
 ///
 /// This implementation is added automatically to any [`crate::device::Device`]
@@ -51,21 +51,21 @@ impl<T: RawHidChannel> RootFeature<T> {
     pub async fn get_feature(
         &self,
         id: u16,
-    ) -> Result<Option<FeatureInformation>, ChannelError<T::Error>> {
+    ) -> Result<Option<FeatureInformation>, Hidpp20Error<T::Error>> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
                 v20::MessageHeader {
                     device_index: self.device_index,
                     feature_index: 0,
-                    function_id: U4::from_lo(0x0),
+                    function_id: U4::from_lo(0),
                     software_id: self.chan.get_sw_id(),
                 },
                 [(id >> 8) as u8, id as u8, 0x00],
             ))
             .await?;
 
-        let payload = v20::Message::from(response).extend_payload();
+        let payload = response.extend_payload();
         if payload[0] == 0 {
             return Ok(None);
         }
@@ -85,21 +85,21 @@ impl<T: RawHidChannel> RootFeature<T> {
     /// This is not implemented here, as the
     /// [`crate::protocol::determine_version`] function does so in a more
     /// general manner.
-    pub async fn ping(&self, data: u8) -> Result<u8, ChannelError<T::Error>> {
+    pub async fn ping(&self, data: u8) -> Result<u8, Hidpp20Error<T::Error>> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
                 v20::MessageHeader {
                     device_index: self.device_index,
                     feature_index: 0,
-                    function_id: U4::from_lo(0x1),
+                    function_id: U4::from_lo(1),
                     software_id: self.chan.get_sw_id(),
                 },
                 [0x00, 0x00, data],
             ))
             .await?;
 
-        let payload = v20::Message::from(response).extend_payload();
+        let payload = response.extend_payload();
         Ok(payload[2])
     }
 }

@@ -1,5 +1,9 @@
 //! Implements functionality specific to HID++2.0.
 
+use std::error::Error;
+
+use thiserror::Error;
+
 use crate::{
     channel::{
         ChannelError,
@@ -121,12 +125,101 @@ impl<T: RawHidChannel> HidppChannel<T> {
     ///
     /// This method simply calls [`Self::send`] with a pre-built response
     /// predicate comparing the headers of the outgoing and incoming message.
-    pub async fn send_v20(&self, msg: Message) -> Result<HidppMessage, ChannelError<T::Error>> {
+    pub async fn send_v20(&self, msg: Message) -> Result<Message, Hidpp20Error<T::Error>> {
         let header = msg.header();
 
-        self.send(msg.into(), move |&response| {
-            Message::from(response).header() == header
-        })
-        .await
+        let response = Message::from(
+            self.send(msg.into(), move |&response| {
+                let resp_msg = Message::from(response);
+                let resp_header = resp_msg.header();
+
+                // A HID++2.0 error response sets the feature index to 0xFF and moves all header
+                // values starting from the real feature index one byte to the right.
+                let is_error = resp_header.device_index == header.device_index
+                    && resp_header.feature_index == 0xff
+                    && nibble::combine(resp_header.function_id, resp_header.software_id)
+                        == header.feature_index
+                    && resp_msg.extend_payload()[0]
+                        == nibble::combine(header.function_id, header.software_id);
+
+                is_error || resp_header == header
+            })
+            .await?,
+        );
+
+        if response.header().feature_index == 0xff {
+            return Err(Hidpp20Error::Feature(ErrorType::from_code(
+                response.extend_payload()[1],
+            )));
+        }
+
+        Ok(response)
     }
+}
+
+/// Represents the type of an error a HID++2.0 device returns if a feature
+/// function fails.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ErrorType {
+    NoError,
+    Unknown,
+    InvalidArgument,
+    OutOfRange,
+    HwError,
+    LogitechInternal,
+    InvalidFeatureIndex,
+    InvalidFunctionId,
+    Busy,
+    Unsupported,
+    Other(u8),
+}
+
+impl ErrorType {
+    /// Constructs an [`ErrorType`] variant from a raw error code.
+    pub fn from_code(code: u8) -> Self {
+        match code {
+            0x00 => Self::NoError,
+            0x01 => Self::Unknown,
+            0x02 => Self::InvalidArgument,
+            0x03 => Self::OutOfRange,
+            0x04 => Self::HwError,
+            0x05 => Self::LogitechInternal,
+            0x06 => Self::InvalidFeatureIndex,
+            0x07 => Self::InvalidFunctionId,
+            0x08 => Self::Busy,
+            0x09 => Self::Unsupported,
+            _ => Self::Other(code),
+        }
+    }
+
+    /// Constructs the raw error code from an [`ErrorType`] variant.
+    pub fn to_code(self) -> u8 {
+        match self {
+            Self::NoError => 0x00,
+            Self::Unknown => 0x01,
+            Self::InvalidArgument => 0x02,
+            Self::OutOfRange => 0x03,
+            Self::HwError => 0x04,
+            Self::LogitechInternal => 0x05,
+            Self::InvalidFeatureIndex => 0x06,
+            Self::InvalidFunctionId => 0x07,
+            Self::Busy => 0x08,
+            Self::Unsupported => 0x09,
+            Self::Other(code) => code,
+        }
+    }
+}
+
+/// Represents an error that may occur when calling a HID++2.0 feature function.
+#[derive(Debug, Error)]
+pub enum Hidpp20Error<T: Error> {
+    /// Indicates that an error occurred while communicating across the HID++
+    /// channel.
+    #[error("the HID++ channel returned an error")]
+    Channel(#[from] ChannelError<T>),
+
+    /// Indicates that a call to a HID++2.0 feature function resulted in an
+    /// error.
+    #[error("a HID++2.0 feature returned an error")]
+    Feature(ErrorType),
 }
