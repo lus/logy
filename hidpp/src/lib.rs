@@ -18,5 +18,6 @@
 
 pub mod channel;
 pub mod device;
+pub mod feature;
 pub mod nibble;
 pub mod protocol;

@@ -268,7 +268,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
     ///
     /// If the given HID channel does not support HID++,
     /// [`ChannelError::HidppNotSupported`] will be returned.
-    pub async fn of_raw_channel(raw: T) -> Result<Self, ChannelError<T::Error>> {
+    pub async fn from_raw_channel(raw: T) -> Result<Self, ChannelError<T::Error>> {
         let (supports_short, supports_long) = supports_short_long_hidpp(&raw).await?;
 
         if !supports_short && !supports_long {
@@ -353,17 +353,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
     /// may rotate (as indicated by [`Self::set_rotating_sw_id`]).
     pub fn get_sw_id(&self) -> U4 {
         if self.rotate_software_id.load(Ordering::SeqCst) {
-            U4::from_lo(
-                self.software_id
-                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old| {
-                        if old & 0x0f == 0x0f {
-                            Some(0x00)
-                        } else {
-                            Some((old + 1) & 0x0f)
-                        }
-                    })
-                    .unwrap(),
-            )
+            U4::from_lo(self.software_id.fetch_add(1, Ordering::SeqCst))
         } else {
             U4::from_lo(self.software_id.load(Ordering::SeqCst))
         }
@@ -386,7 +376,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
         &self,
         msg: HidppMessage,
         response_predicate: impl Fn(&HidppMessage) -> bool + Send + 'static,
-    ) -> Result<Option<HidppMessage>, ChannelError<T::Error>> {
+    ) -> Result<HidppMessage, ChannelError<T::Error>> {
         if !self.supports_msg(&msg) {
             return Err(ChannelError::MessageTypeNotSupported);
         }
@@ -403,7 +393,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
 
         self.send_and_forget(msg).await?;
 
-        Ok(receiver.await.ok())
+        receiver.await.map_err(|_| ChannelError::NoResponse)
     }
 
     /// Sends a HID++ message across the channel and does not wait for a
@@ -446,4 +436,8 @@ pub enum ChannelError<T: Error> {
     /// type (short/long).
     #[error("the channel does not support the given HID++ message type")]
     MessageTypeNotSupported,
+
+    /// Indicates that no response was received following a request.
+    #[error("the device did not respond to the request")]
+    NoResponse,
 }

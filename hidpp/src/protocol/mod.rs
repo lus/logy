@@ -92,13 +92,7 @@ pub async fn determine_version<T: RawHidChannel>(
         })
         .await?;
 
-    // If we receive no response, we'll just assume the device is unreachable and
-    // thus not found.
-    let Some(resp_msg) = response else {
-        return Err(ProtocolError::DeviceNotFound);
-    };
-
-    let v20_msg = v20::Message::from(resp_msg);
+    let v20_msg = v20::Message::from(response);
     if v20_msg.header() == msg.header() {
         let payload = v20_msg.extend_payload();
         return Ok(ProtocolVersion::V20 {
@@ -107,7 +101,7 @@ pub async fn determine_version<T: RawHidChannel>(
         });
     }
 
-    let v10::Message::Short(_, payload) = v10::Message::from(resp_msg) else {
+    let v10::Message::Short(_, payload) = v10::Message::from(response) else {
         return Err(ProtocolError::DeviceNotFound);
     };
 

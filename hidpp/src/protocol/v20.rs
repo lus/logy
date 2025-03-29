@@ -1,7 +1,14 @@
 //! Implements functionality specific to HID++2.0.
 
 use crate::{
-    channel::{HidppMessage, LONG_REPORT_LENGTH, SHORT_REPORT_LENGTH},
+    channel::{
+        ChannelError,
+        HidppChannel,
+        HidppMessage,
+        LONG_REPORT_LENGTH,
+        RawHidChannel,
+        SHORT_REPORT_LENGTH,
+    },
     nibble::{self, U4},
 };
 
@@ -105,5 +112,21 @@ impl From<Message> for HidppMessage {
                 HidppMessage::Long(data)
             },
         }
+    }
+}
+
+impl<T: RawHidChannel> HidppChannel<T> {
+    /// Sends a HID++2.0 message across the channel and waits for a response
+    /// that matches the message header.
+    ///
+    /// This method simply calls [`Self::send`] with a pre-built response
+    /// predicate comparing the headers of the outgoing and incoming message.
+    pub async fn send_v20(&self, msg: Message) -> Result<HidppMessage, ChannelError<T::Error>> {
+        let header = msg.header();
+
+        self.send(msg.into(), move |&response| {
+            Message::from(response).header() == header
+        })
+        .await
     }
 }

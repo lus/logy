@@ -1,19 +1,25 @@
 //! Implements peripheral devices connected to HID++ channels.
 
-use std::{error::Error, sync::Arc};
+use std::{any::TypeId, collections::HashMap, error::Error, sync::Arc};
 
 use thiserror::Error;
 
 use crate::{
     channel::{ChannelError, HidppChannel, RawHidChannel},
+    feature::{Feature, root::RootFeature},
     protocol::{self, ProtocolError, ProtocolVersion},
 };
 
 /// Represents a single HID++ device connected to a [`HidppChannel`].
 ///
 /// This is used only for peripheral devices and not receivers.
+#[derive(Clone)]
 pub struct Device<T: RawHidChannel> {
+    /// The underlying HID++ channel.
     chan: Arc<HidppChannel<T>>,
+
+    /// The initialized implementation of features the device supports.
+    features: HashMap<TypeId, Arc<dyn Feature<T>>>,
 
     /// The index of the device on the HID++ channel.
     pub device_index: u8,
@@ -48,11 +54,48 @@ impl<T: RawHidChannel> Device<T> {
             return Err(DeviceError::UnsupportedProtocolVersion);
         }
 
-        Ok(Self {
-            chan,
+        let mut device = Self {
+            chan: Arc::clone(&chan),
+            features: HashMap::new(),
             device_index,
             protocol_version,
-        })
+        };
+
+        // Every HID++2.0 device supports the root feature.
+        // We implicitly verified that using [`protocol::determine_version`].
+        device.add_feature(RootFeature::new(chan, device.device_index));
+
+        Ok(device)
+    }
+
+    /// Adds a new feature implementation to the list of available features.
+    /// This will override an existing implementation of the same type.
+    /// The caller is responsible for making sure the device actually supports
+    /// the feature.
+    pub fn add_feature<F: Feature<T>>(&mut self, feature: F) -> Arc<F> {
+        let feat_rc: Arc<dyn Feature<T>> = Arc::new(feature);
+
+        self.features
+            .insert(TypeId::of::<F>(), Arc::clone(&feat_rc));
+
+        Arc::downcast::<F>(feat_rc).unwrap()
+    }
+
+    /// Checks whether a specific feature implementation is provided by the
+    /// device.
+    pub fn provides_feature<F: Feature<T>>(&self) -> bool {
+        self.features.contains_key(&TypeId::of::<F>())
+    }
+
+    /// Tries to retrieve a feature implementation from the device.
+    ///
+    /// Returns [`None`] if the requested feature implementation is not
+    /// provided.
+    pub fn get_feature<F: Feature<T>>(&self) -> Option<Arc<F>> {
+        self.features
+            .get(&TypeId::of::<F>())
+            .cloned()
+            .and_then(|feat| Arc::downcast::<F>(feat).ok())
     }
 }
 
