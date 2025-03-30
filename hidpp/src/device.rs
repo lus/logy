@@ -6,8 +6,17 @@ use thiserror::Error;
 
 use crate::{
     channel::{ChannelError, HidppChannel, RawHidChannel},
-    feature::{self, CreatableFeature, Feature, root},
-    protocol::{self, ProtocolVersion},
+    feature::{
+        self,
+        CreatableFeature,
+        Feature,
+        feature_set::{
+            self,
+            v0::{FeatureInformation, FeatureSetFeatureV0},
+        },
+        root::RootFeature,
+    },
+    protocol::{self, ProtocolVersion, v20::Hidpp20Error},
 };
 
 /// Represents a single HID++ device connected to a [`HidppChannel`].
@@ -63,9 +72,15 @@ impl<T: RawHidChannel> Device<T> {
 
         // Every HID++2.0 device supports the root feature.
         // We implicitly verified that using [`protocol::determine_version`].
-        feature::add_implementation(&mut device, 0, root::FEATURE_ID, 0);
+        device.add_feature::<RootFeature<T>>(0);
 
         Ok(device)
+    }
+
+    /// A convenience wrapper around [`Self::get_feature`] to obtain the root
+    /// feature.
+    pub fn root(&self) -> Arc<RootFeature<T>> {
+        self.get_feature::<RootFeature<T>>().unwrap()
     }
 
     /// Adds a new feature implementation to the list of available features.
@@ -112,6 +127,47 @@ impl<T: RawHidChannel> Device<T> {
             .get(&TypeId::of::<F>())
             .cloned()
             .and_then(|feat| Arc::downcast::<F>(feat).ok())
+    }
+
+    /// Tries to detect all features supported by the device and add
+    /// implementations for them using [`feature::add_implementation`].
+    ///
+    /// Returns a vector containing all feature IDs supported by the device.
+    ///
+    /// Returns `Ok(None)` if the [`FeatureSetFeatureV0`] feature, which is
+    /// required for feature enumeration, is not supported by the device.
+    pub async fn enumerate_features(
+        &mut self,
+    ) -> Result<Option<Vec<FeatureInformation>>, Hidpp20Error<T::Error>> {
+        let Some(feature_set_info) = self.root().get_feature(feature_set::FEATURE_ID).await? else {
+            return Ok(None);
+        };
+
+        feature::add_implementation(
+            self,
+            feature_set_info.index,
+            feature_set::FEATURE_ID,
+            feature_set_info.version,
+        );
+
+        let Some(feature_set_feature) = self.get_feature::<FeatureSetFeatureV0<T>>() else {
+            return Ok(None);
+        };
+
+        let count = feature_set_feature.count().await?;
+        let mut features = Vec::with_capacity(count as usize);
+        for i in 1..=count {
+            let info = feature_set_feature.get_feature(i).await?;
+            features.push(info);
+
+            if i == feature_set_info.index {
+                continue;
+            }
+
+            feature::add_implementation(self, i, info.id, info.version);
+        }
+
+        Ok(Some(features))
     }
 }
 

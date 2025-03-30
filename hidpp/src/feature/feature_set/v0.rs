@@ -71,7 +71,7 @@ impl<T: RawHidChannel> FeatureSetFeatureV0<T> {
     pub async fn get_feature(
         &self,
         index: u8,
-    ) -> Result<Option<FeatureInformation>, Hidpp20Error<T::Error>> {
+    ) -> Result<FeatureInformation, Hidpp20Error<T::Error>> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
@@ -87,11 +87,11 @@ impl<T: RawHidChannel> FeatureSetFeatureV0<T> {
 
         let payload = response.extend_payload();
 
-        Ok(Some(FeatureInformation {
+        Ok(FeatureInformation {
             id: (payload[0] as u16) << 8 | payload[1] as u16,
             typ: FeatureType::from_bits(payload[2]),
             version: payload[3],
-        }))
+        })
     }
 }
 
