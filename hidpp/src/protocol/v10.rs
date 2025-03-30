@@ -122,25 +122,26 @@ pub enum MessageType {
     Error = 0x8f,
 }
 
-impl MessageType {
-    /// Tries to construct a [`MessageType`] variant from the raw sub ID of a
-    /// HID++1.0 message.
-    ///
-    /// Returns [`None`] if no variant matches the given sub ID.
-    pub fn from_sub_id(sub_id: u8) -> Option<Self> {
-        match sub_id {
-            0x80 => Some(Self::SetRegister),
-            0x81 => Some(Self::GetRegister),
-            0x82 => Some(Self::SetLongRegister),
-            0x83 => Some(Self::GetLongRegister),
-            0x8f => Some(Self::Error),
-            _ => None,
+impl TryFrom<u8> for MessageType {
+    type Error = ();
+
+    fn try_from(
+        value: u8,
+    ) -> Result<Self, <crate::protocol::v10::MessageType as TryFrom<u8>>::Error> {
+        match value {
+            x if x == Self::SetRegister as u8 => Ok(Self::SetRegister),
+            x if x == Self::GetRegister as u8 => Ok(Self::GetRegister),
+            x if x == Self::SetLongRegister as u8 => Ok(Self::SetLongRegister),
+            x if x == Self::GetLongRegister as u8 => Ok(Self::GetLongRegister),
+            x if x == Self::Error as u8 => Ok(Self::Error),
+            _ => Err(()),
         }
     }
+}
 
-    /// Constructs the raw sub ID from a [`MessageType`] variant.
-    pub fn to_sub_id(self) -> u8 {
-        self as u8
+impl From<MessageType> for u8 {
+    fn from(value: MessageType) -> Self {
+        value as u8
     }
 }
 
@@ -204,36 +205,34 @@ pub enum ErrorType {
     Reserved,
 }
 
-impl ErrorType {
-    /// Constructs an [`Error`] variant from the raw error code included in a
-    /// [`MessageType::Error`] message.
-    pub fn from_code(code: u8) -> Self {
-        match code {
-            0x00 => Self::Success,
-            0x01 => Self::InvalidSubId,
-            0x02 => Self::InvalidAddress,
-            0x03 => Self::InvalidValue,
-            0x04 => Self::ConnectFail,
-            0x05 => Self::TooManyDevices,
-            0x06 => Self::AlreadyExists,
-            0x07 => Self::Busy,
-            0x08 => Self::UnknownDevice,
-            0x09 => Self::ResourceError,
-            0x0a => Self::RequestUnavailable,
-            0x0b => Self::InvalidParamValue,
-            0x0c => Self::WrongPinCode,
-            0x0d..=0xff => Self::Reserved,
+impl From<u8> for ErrorType {
+    fn from(value: u8) -> Self {
+        match value {
+            x if x == Self::Success as u8 => Self::Success,
+            x if x == Self::InvalidSubId as u8 => Self::InvalidSubId,
+            x if x == Self::InvalidAddress as u8 => Self::InvalidAddress,
+            x if x == Self::InvalidValue as u8 => Self::InvalidValue,
+            x if x == Self::ConnectFail as u8 => Self::ConnectFail,
+            x if x == Self::TooManyDevices as u8 => Self::TooManyDevices,
+            x if x == Self::AlreadyExists as u8 => Self::AlreadyExists,
+            x if x == Self::Busy as u8 => Self::Busy,
+            x if x == Self::UnknownDevice as u8 => Self::UnknownDevice,
+            x if x == Self::ResourceError as u8 => Self::ResourceError,
+            x if x == Self::RequestUnavailable as u8 => Self::RequestUnavailable,
+            x if x == Self::InvalidParamValue as u8 => Self::InvalidParamValue,
+            x if x == Self::WrongPinCode as u8 => Self::WrongPinCode,
+            _ => Self::Reserved,
         }
     }
+}
 
-    /// Tries to construct the raw error code from an [`Error`] variant.
-    ///
-    /// Returns [`None`] for [`Self::Reserved`], as no single error code is
-    /// defined for this variant.
-    pub fn to_code(self) -> Option<u8> {
-        match self {
-            Self::Reserved => None,
-            _ => Some(self as u8),
+impl TryFrom<ErrorType> for u8 {
+    type Error = ();
+
+    fn try_from(value: ErrorType) -> Result<Self, Self::Error> {
+        match value {
+            ErrorType::Reserved => Err(()),
+            _ => Ok(value as u8),
         }
     }
 }

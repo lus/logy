@@ -10,9 +10,6 @@ use crate::{
     protocol::v20::{self, Hidpp20Error},
 };
 
-/// The protocol ID of the feature.
-pub const FEATURE_ID: u16 = 0x0000;
-
 /// Implements the `Root` / `0x0000` feature that every HID++2.0 device
 /// supports by default.
 ///
@@ -28,6 +25,9 @@ pub struct RootFeature<T: RawHidChannel> {
 }
 
 impl<T: RawHidChannel> CreatableFeature<T> for RootFeature<T> {
+    const ID: u16 = 0x0000;
+    const STARTING_VERSION: u8 = 0;
+
     fn new(chan: Arc<HidppChannel<T>>, device_index: u8, _: u8) -> Self {
         Self {
             chan,
@@ -71,7 +71,7 @@ impl<T: RawHidChannel> RootFeature<T> {
 
         Ok(Some(FeatureInformation {
             index: payload[0],
-            typ: FeatureType::from_bits(payload[1]),
+            typ: FeatureType::from(payload[1]),
             version: payload[2],
         }))
     }

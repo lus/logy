@@ -78,7 +78,7 @@ pub async fn determine_version<T: RawHidChannel>(
             // to the spec.
             if let v10::Message::Short(header, payload) = v10::Message::from(*resp) {
                 if header.device_index == device_index
-                    && header.sub_id == v10::MessageType::Error.to_sub_id()
+                    && header.sub_id == v10::MessageType::Error.into()
                     // The feature index we sent would be interpreted as the sub ID by HID++1.0, which is included in the error message.
                     && payload[0] == 0x00
                     // The function & software IDs would be interpreted as the register address in HID++1.0.
@@ -105,7 +105,7 @@ pub async fn determine_version<T: RawHidChannel>(
         return Ok(None);
     };
 
-    if payload[2] == v10::ErrorType::InvalidSubId.to_code().unwrap() {
+    if payload[2] == v10::ErrorType::InvalidSubId.try_into().unwrap() {
         Ok(Some(ProtocolVersion::V10))
     } else {
         Ok(None)

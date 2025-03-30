@@ -10,10 +10,7 @@ use crate::{
         self,
         CreatableFeature,
         Feature,
-        feature_set::{
-            self,
-            v0::{FeatureInformation, FeatureSetFeatureV0},
-        },
+        feature_set::v0::{FeatureInformation, FeatureSetFeatureV0},
         root::RootFeature,
     },
     protocol::{self, ProtocolVersion, v20::Hidpp20Error},
@@ -139,14 +136,18 @@ impl<T: RawHidChannel> Device<T> {
     pub async fn enumerate_features(
         &mut self,
     ) -> Result<Option<Vec<FeatureInformation>>, Hidpp20Error<T::Error>> {
-        let Some(feature_set_info) = self.root().get_feature(feature_set::FEATURE_ID).await? else {
+        let Some(feature_set_info) = self
+            .root()
+            .get_feature(FeatureSetFeatureV0::<T>::ID)
+            .await?
+        else {
             return Ok(None);
         };
 
         feature::add_implementation(
             self,
             feature_set_info.index,
-            feature_set::FEATURE_ID,
+            FeatureSetFeatureV0::<T>::ID,
             feature_set_info.version,
         );
 

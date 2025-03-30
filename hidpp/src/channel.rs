@@ -334,6 +334,9 @@ impl<T: RawHidChannel> HidppChannel<T> {
 
     /// Sets the software ID that should be returned by the next call to
     /// [`Self::get_sw_id`].
+    ///
+    /// Using software ID `0` is highly discouraged as it is used for device
+    /// notifications.
     pub fn set_sw_id(&self, sw_id: U4) {
         self.software_id.store(sw_id.to_lo(), Ordering::SeqCst);
     }

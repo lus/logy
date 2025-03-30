@@ -148,7 +148,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
         );
 
         if response.header().feature_index == 0xff {
-            return Err(Hidpp20Error::Feature(ErrorType::from_code(
+            return Err(Hidpp20Error::Feature(ErrorType::from(
                 response.extend_payload()[1],
             )));
         }
@@ -174,38 +174,38 @@ pub enum ErrorType {
     Other(u8),
 }
 
-impl ErrorType {
-    /// Constructs an [`ErrorType`] variant from a raw error code.
-    pub fn from_code(code: u8) -> Self {
-        match code {
-            0x00 => Self::NoError,
-            0x01 => Self::Unknown,
-            0x02 => Self::InvalidArgument,
-            0x03 => Self::OutOfRange,
-            0x04 => Self::HwError,
-            0x05 => Self::LogitechInternal,
-            0x06 => Self::InvalidFeatureIndex,
-            0x07 => Self::InvalidFunctionId,
-            0x08 => Self::Busy,
-            0x09 => Self::Unsupported,
-            _ => Self::Other(code),
+impl From<u8> for ErrorType {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::NoError,
+            1 => Self::Unknown,
+            2 => Self::InvalidArgument,
+            3 => Self::OutOfRange,
+            4 => Self::HwError,
+            5 => Self::LogitechInternal,
+            6 => Self::InvalidFeatureIndex,
+            7 => Self::InvalidFunctionId,
+            8 => Self::Busy,
+            9 => Self::Unsupported,
+            _ => Self::Other(value),
         }
     }
+}
 
-    /// Constructs the raw error code from an [`ErrorType`] variant.
-    pub fn to_code(self) -> u8 {
-        match self {
-            Self::NoError => 0x00,
-            Self::Unknown => 0x01,
-            Self::InvalidArgument => 0x02,
-            Self::OutOfRange => 0x03,
-            Self::HwError => 0x04,
-            Self::LogitechInternal => 0x05,
-            Self::InvalidFeatureIndex => 0x06,
-            Self::InvalidFunctionId => 0x07,
-            Self::Busy => 0x08,
-            Self::Unsupported => 0x09,
-            Self::Other(code) => code,
+impl From<ErrorType> for u8 {
+    fn from(value: ErrorType) -> Self {
+        match value {
+            ErrorType::NoError => 0,
+            ErrorType::Unknown => 1,
+            ErrorType::InvalidArgument => 2,
+            ErrorType::OutOfRange => 3,
+            ErrorType::HwError => 4,
+            ErrorType::LogitechInternal => 5,
+            ErrorType::InvalidFeatureIndex => 6,
+            ErrorType::InvalidFunctionId => 7,
+            ErrorType::Busy => 8,
+            ErrorType::Unsupported => 9,
+            ErrorType::Other(code) => code,
         }
     }
 }

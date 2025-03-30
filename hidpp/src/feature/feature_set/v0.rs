@@ -1,4 +1,4 @@
-//! Implements versions v0-v2 of the feature.
+//! Implements the feature starting with version 0.
 
 use std::sync::Arc;
 
@@ -11,8 +11,7 @@ use crate::{
 
 /// Implements the `FeatureSet` / `0x0001` feature.
 ///
-/// The versions currently supported by this implementation are v0-v2, as no
-/// change in this range was breaking.
+/// The first version supported by this feature is v0.
 ///
 /// This feature is primarily used to collect all features supported by the
 /// device. To achieve this, call [`Self::count`] to retrieve the amount of
@@ -32,6 +31,9 @@ pub struct FeatureSetFeatureV0<T: RawHidChannel> {
 }
 
 impl<T: RawHidChannel> CreatableFeature<T> for FeatureSetFeatureV0<T> {
+    const ID: u16 = 0x0001;
+    const STARTING_VERSION: u8 = 0;
+
     fn new(chan: Arc<HidppChannel<T>>, device_index: u8, feature_index: u8) -> Self {
         Self {
             chan,
@@ -89,7 +91,7 @@ impl<T: RawHidChannel> FeatureSetFeatureV0<T> {
 
         Ok(FeatureInformation {
             id: (payload[0] as u16) << 8 | payload[1] as u16,
-            typ: FeatureType::from_bits(payload[2]),
+            typ: FeatureType::from(payload[2]),
             version: payload[3],
         })
     }
