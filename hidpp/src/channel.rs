@@ -325,7 +325,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
             supports_long,
             raw_channel: raw_channel_rc,
             rotate_software_id: AtomicBool::new(false),
-            software_id: AtomicU8::new(0x00),
+            software_id: AtomicU8::new(0x01),
             pending_messages: pending_messages_rc,
             read_thread_close: Some(close_sender),
             read_thread_hdl: Some(read_thread_hdl),
@@ -340,8 +340,12 @@ impl<T: RawHidChannel> HidppChannel<T> {
 
     /// Sets whether the software ID returned by a call to [`Self::get_sw_id`]
     /// should increment (and potentially wrap around) after each call.
+    ///
     /// This comes in handy when trying to map responses to requests
     /// consistently.
+    ///
+    /// Software ID `0` will be skipped in the rotation process as it is
+    /// reserved for device notifications.
     pub fn set_rotating_sw_id(&self, enable: bool) {
         self.rotate_software_id.store(enable, Ordering::SeqCst);
     }
@@ -353,7 +357,17 @@ impl<T: RawHidChannel> HidppChannel<T> {
     /// may rotate (as indicated by [`Self::set_rotating_sw_id`]).
     pub fn get_sw_id(&self) -> U4 {
         if self.rotate_software_id.load(Ordering::SeqCst) {
-            U4::from_lo(self.software_id.fetch_add(1, Ordering::SeqCst))
+            U4::from_lo(
+                self.software_id
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old| {
+                        Some(if old & 0x0f == 0x0f {
+                            0x01
+                        } else {
+                            old.wrapping_add(1)
+                        })
+                    })
+                    .unwrap(),
+            )
         } else {
             U4::from_lo(self.software_id.load(Ordering::SeqCst))
         }
