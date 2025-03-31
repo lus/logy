@@ -13,6 +13,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
+use async_trait::async_trait;
 use futures::{FutureExt, channel::oneshot, select};
 use hidreport::{Field, Report, ReportDescriptor, Usage, UsageId, UsagePage};
 use thiserror::Error;
@@ -59,14 +60,12 @@ pub const LONG_REPORT_LENGTH: usize = 20;
 /// communication. If a specific channel supports HID++ is determined at a later
 /// stage and is not directly related to potential implementations of this
 /// trait.
-pub trait RawHidChannel: Send + Sync + 'static {
-    /// An implementation-specific error type.
-    type Error: Error;
-
+#[async_trait]
+pub trait RawHidChannel: Sync + Send + 'static {
     /// Writes a raw report to the channel.
     ///
     /// Returns the exact amount of written bytes on success.
-    fn write_report(&self, src: &[u8]) -> impl Future<Output = Result<usize, Self::Error>> + Send;
+    async fn write_report(&self, src: &[u8]) -> Result<usize, Box<dyn Error>>;
 
     /// Reads a raw report from the channel.
     ///
@@ -75,10 +74,7 @@ pub trait RawHidChannel: Send + Sync + 'static {
     /// [`Self::read_report`].
     ///
     /// Returns the exact amount or read bytes on success.
-    fn read_report(
-        &self,
-        buf: &mut [u8],
-    ) -> impl Future<Output = Result<usize, Self::Error>> + Send;
+    async fn read_report(&self, buf: &mut [u8]) -> Result<usize, Box<dyn Error>>;
 
     /// If the implementation already knows whether the underlying HID channel
     /// supports HID++ messages, it should return `Some((supports_short,
@@ -92,16 +88,13 @@ pub trait RawHidChannel: Send + Sync + 'static {
     /// This is used to determine whether the channel supports HID++.
     ///
     /// Returns the exact size of the report descriptor on success.
-    fn get_report_descriptor(
-        &self,
-        buf: &mut [u8],
-    ) -> impl Future<Output = Result<usize, Self::Error>> + Send;
+    async fn get_report_descriptor(&self, buf: &mut [u8]) -> Result<usize, Box<dyn Error>>;
 }
 
 /// Checks whether a raw channel supports short or long HID++ messages.
-async fn supports_short_long_hidpp<T: RawHidChannel>(
-    chan: &T,
-) -> Result<(bool, bool), ChannelError<T::Error>> {
+async fn supports_short_long_hidpp(
+    chan: &impl RawHidChannel,
+) -> Result<(bool, bool), ChannelError> {
     if let Some((supports_short, supports_long)) = chan.supports_short_long_hidpp() {
         return Ok((supports_short, supports_long));
     }
@@ -209,7 +202,7 @@ impl HidppMessage {
 }
 
 /// Represents a HID communication channel supporting HID++.
-pub struct HidppChannel<T: RawHidChannel> {
+pub struct HidppChannel {
     /// Whether the channel supports short (7 bytes) HID++ messages.
     pub supports_short: bool,
 
@@ -217,7 +210,7 @@ pub struct HidppChannel<T: RawHidChannel> {
     pub supports_long: bool,
 
     /// The underlying raw HID channel.
-    raw_channel: Arc<T>,
+    raw_channel: Arc<dyn RawHidChannel>,
 
     /// Whether to rotate the [`Self::software_id`].
     rotate_software_id: AtomicBool,
@@ -236,7 +229,7 @@ pub struct HidppChannel<T: RawHidChannel> {
     read_thread_hdl: Option<JoinHandle<()>>,
 }
 
-impl<T: RawHidChannel> Drop for HidppChannel<T> {
+impl Drop for HidppChannel {
     fn drop(&mut self) {
         if let Some(read_thread_close) = self.read_thread_close.take() {
             // This only fails if the receiving end, which is owned by the read thread in
@@ -263,12 +256,12 @@ struct PendingMessage {
     sender: oneshot::Sender<HidppMessage>,
 }
 
-impl<T: RawHidChannel> HidppChannel<T> {
+impl HidppChannel {
     /// Tries to construct a HID++ channel from a raw HID channel.
     ///
     /// If the given HID channel does not support HID++,
     /// [`ChannelError::HidppNotSupported`] will be returned.
-    pub async fn from_raw_channel(raw: T) -> Result<Self, ChannelError<T::Error>> {
+    pub async fn from_raw_channel(raw: impl RawHidChannel) -> Result<Self, ChannelError> {
         let (supports_short, supports_long) = supports_short_long_hidpp(&raw).await?;
 
         if !supports_short && !supports_long {
@@ -393,7 +386,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
         &self,
         msg: HidppMessage,
         response_predicate: impl Fn(&HidppMessage) -> bool + Send + 'static,
-    ) -> Result<HidppMessage, ChannelError<T::Error>> {
+    ) -> Result<HidppMessage, ChannelError> {
         if !self.supports_msg(&msg) {
             return Err(ChannelError::MessageTypeNotSupported);
         }
@@ -417,7 +410,7 @@ impl<T: RawHidChannel> HidppChannel<T> {
     /// response.
     ///
     /// If a response is expected, use [`Self::send`],
-    pub async fn send_and_forget(&self, msg: HidppMessage) -> Result<(), ChannelError<T::Error>> {
+    pub async fn send_and_forget(&self, msg: HidppMessage) -> Result<(), ChannelError> {
         if !self.supports_msg(&msg) {
             return Err(ChannelError::MessageTypeNotSupported);
         }
@@ -435,11 +428,11 @@ impl<T: RawHidChannel> HidppChannel<T> {
 /// Represents an error that occurred when creating or interacting with a HID or
 /// HID++ communication channel.
 #[derive(Debug, Error)]
-pub enum ChannelError<T: Error> {
+pub enum ChannelError {
     /// Indicates that the concrete implementation of [`RawHidChannel`] returned
     /// an error of type [`RawHidChannel::Error`].
     #[error("the HID channel implementation returned an error")]
-    Implementation(#[from] T),
+    Implementation(#[from] Box<dyn Error>),
 
     /// Indicates that the HID report descriptor could not be parsed.
     #[error("the report descriptor could not be parsed")]

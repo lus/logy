@@ -1,11 +1,11 @@
-//! Implements the Root feature (ID `0x0000`) that every device supports by
+//! Implements the `Root` feature (ID `0x0000`) that every device supports by
 //! default.
 
 use std::sync::Arc;
 
 use super::{CreatableFeature, Feature, FeatureType};
 use crate::{
-    channel::{HidppChannel, RawHidChannel},
+    channel::HidppChannel,
     nibble::U4,
     protocol::v20::{self, Hidpp20Error},
 };
@@ -16,19 +16,19 @@ use crate::{
 /// This implementation is added automatically to any [`crate::device::Device`]
 /// created using [`crate::device::Device::new`].
 #[derive(Clone)]
-pub struct RootFeature<T: RawHidChannel> {
+pub struct RootFeature {
     /// The underlying HID++ channel.
-    chan: Arc<HidppChannel<T>>,
+    chan: Arc<HidppChannel>,
 
     /// The index of the device to implement the feature for.
     device_index: u8,
 }
 
-impl<T: RawHidChannel> CreatableFeature<T> for RootFeature<T> {
+impl CreatableFeature for RootFeature {
     const ID: u16 = 0x0000;
     const STARTING_VERSION: u8 = 0;
 
-    fn new(chan: Arc<HidppChannel<T>>, device_index: u8, _: u8) -> Self {
+    fn new(chan: Arc<HidppChannel>, device_index: u8, _: u8) -> Self {
         Self {
             chan,
             device_index,
@@ -36,10 +36,10 @@ impl<T: RawHidChannel> CreatableFeature<T> for RootFeature<T> {
     }
 }
 
-impl<T: RawHidChannel> Feature<T> for RootFeature<T> {
+impl Feature for RootFeature {
 }
 
-impl<T: RawHidChannel> RootFeature<T> {
+impl RootFeature {
     /// Retrieves information about a specific feature ID, including its index
     /// in the feature table, its type and its version.
     ///
@@ -47,10 +47,7 @@ impl<T: RawHidChannel> RootFeature<T> {
     ///
     /// If the device only supports the root feature version 1, the
     /// [`FeatureInformation::version`] field will be `0` for all features.
-    pub async fn get_feature(
-        &self,
-        id: u16,
-    ) -> Result<Option<FeatureInformation>, Hidpp20Error<T::Error>> {
+    pub async fn get_feature(&self, id: u16) -> Result<Option<FeatureInformation>, Hidpp20Error> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
@@ -84,7 +81,7 @@ impl<T: RawHidChannel> RootFeature<T> {
     /// This is not implemented here, as the
     /// [`crate::protocol::determine_version`] function does so in a more
     /// general manner.
-    pub async fn ping(&self, data: u8) -> Result<u8, Hidpp20Error<T::Error>> {
+    pub async fn ping(&self, data: u8) -> Result<u8, Hidpp20Error> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(

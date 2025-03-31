@@ -5,20 +5,17 @@ use std::{any::Any, sync::Arc};
 use device_type_and_name::v0::DeviceTypeAndNameFeatureV0;
 use feature_set::v0::FeatureSetFeatureV0;
 
-use crate::{
-    channel::{HidppChannel, RawHidChannel},
-    device::Device,
-};
+use crate::{channel::HidppChannel, device::Device};
 
 pub mod device_type_and_name;
 pub mod feature_set;
 pub mod root;
 
 /// Represents a concrete implementation of a HID++2.0 device feature.
-pub trait Feature<T: RawHidChannel>: Any + Send + Sync {}
+pub trait Feature: Any + Send + Sync {}
 
 /// Represents a [`Feature`] that can be instantiated automatically.
-pub trait CreatableFeature<T: RawHidChannel>: Feature<T> {
+pub trait CreatableFeature: Feature {
     /// The protocol ID of the implemented feature.
     const ID: u16;
 
@@ -26,7 +23,7 @@ pub trait CreatableFeature<T: RawHidChannel>: Feature<T> {
     const STARTING_VERSION: u8;
 
     /// Creates a new instance of the feature implementation.
-    fn new(chan: Arc<HidppChannel<T>>, device_index: u8, feature_index: u8) -> Self;
+    fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self;
 }
 
 /// A bitfield describing some properties of a feature.
@@ -99,22 +96,17 @@ impl From<FeatureType> for u8 {
 /// Returns whether an implementation exists and thus was added or not.
 ///
 /// This does NOT check whether the device actually supports the feature.
-pub fn add_implementation<T: RawHidChannel>(
-    dev: &mut Device<T>,
-    index: u8,
-    id: u16,
-    version: u8,
-) -> bool {
+pub fn add_implementation(dev: &mut Device, index: u8, id: u16, version: u8) -> bool {
     [
-        maybe_add_implementation::<_, FeatureSetFeatureV0<T>>(dev, id, index, version),
-        maybe_add_implementation::<_, DeviceTypeAndNameFeatureV0<T>>(dev, id, index, version),
+        maybe_add_implementation::<FeatureSetFeatureV0>(dev, id, index, version),
+        maybe_add_implementation::<DeviceTypeAndNameFeatureV0>(dev, id, index, version),
     ]
     .iter()
     .any(|elem| *elem)
 }
 
-fn maybe_add_implementation<T: RawHidChannel, F: CreatableFeature<T>>(
-    dev: &mut Device<T>,
+fn maybe_add_implementation<F: CreatableFeature>(
+    dev: &mut Device,
     id: u16,
     index: u8,
     version: u8,

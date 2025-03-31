@@ -16,6 +16,8 @@
 //! with a lot of documentation on HID++ and several device features. These
 //! documents were heavily used during the development of this crate.
 
+pub use async_trait::async_trait;
+
 pub mod channel;
 pub mod device;
 pub mod feature;

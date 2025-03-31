@@ -3,7 +3,7 @@
 use std::{cmp::min, sync::Arc};
 
 use crate::{
-    channel::{HidppChannel, RawHidChannel},
+    channel::HidppChannel,
     feature::{CreatableFeature, Feature},
     nibble::U4,
     protocol::v20::{self, Hidpp20Error},
@@ -13,9 +13,9 @@ use crate::{
 ///
 /// The first version supported by this feature is v0.
 #[derive(Clone)]
-pub struct DeviceTypeAndNameFeatureV0<T: RawHidChannel> {
+pub struct DeviceTypeAndNameFeatureV0 {
     /// The underlying HID++ channel.
-    chan: Arc<HidppChannel<T>>,
+    chan: Arc<HidppChannel>,
 
     /// The index of the device to implement the feature for.
     device_index: u8,
@@ -24,11 +24,11 @@ pub struct DeviceTypeAndNameFeatureV0<T: RawHidChannel> {
     feature_index: u8,
 }
 
-impl<T: RawHidChannel> CreatableFeature<T> for DeviceTypeAndNameFeatureV0<T> {
+impl CreatableFeature for DeviceTypeAndNameFeatureV0 {
     const ID: u16 = 0x0005;
     const STARTING_VERSION: u8 = 0;
 
-    fn new(chan: Arc<HidppChannel<T>>, device_index: u8, feature_index: u8) -> Self {
+    fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
         Self {
             chan,
             device_index,
@@ -37,12 +37,12 @@ impl<T: RawHidChannel> CreatableFeature<T> for DeviceTypeAndNameFeatureV0<T> {
     }
 }
 
-impl<T: RawHidChannel> Feature<T> for DeviceTypeAndNameFeatureV0<T> {
+impl Feature for DeviceTypeAndNameFeatureV0 {
 }
 
-impl<T: RawHidChannel> DeviceTypeAndNameFeatureV0<T> {
+impl DeviceTypeAndNameFeatureV0 {
     /// Retrieves the amount of characters in the marketing name of the device.
-    pub async fn get_device_name_count(&self) -> Result<u8, Hidpp20Error<T::Error>> {
+    pub async fn get_device_name_count(&self) -> Result<u8, Hidpp20Error> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
@@ -69,7 +69,7 @@ impl<T: RawHidChannel> DeviceTypeAndNameFeatureV0<T> {
     /// retrieve the whole device name.\
     /// A convenience wrapper implementing this functionality is provided under
     /// [`Self::get_whole_device_name`].
-    pub async fn get_device_name(&self, index: u8) -> Result<Vec<u8>, Hidpp20Error<T::Error>> {
+    pub async fn get_device_name(&self, index: u8) -> Result<Vec<u8>, Hidpp20Error> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
@@ -92,7 +92,7 @@ impl<T: RawHidChannel> DeviceTypeAndNameFeatureV0<T> {
     /// Retrieves the whole marketing name of the device by first calling
     /// [`Self::get_device_name_count`] once and then repeatedly calling
     /// [`Self::get_device_name`] until all characters were received.
-    pub async fn get_whole_device_name(&self) -> Result<String, Hidpp20Error<T::Error>> {
+    pub async fn get_whole_device_name(&self) -> Result<String, Hidpp20Error> {
         let count = self.get_device_name_count().await?;
         let mut string = String::with_capacity(count as usize);
 
@@ -110,7 +110,7 @@ impl<T: RawHidChannel> DeviceTypeAndNameFeatureV0<T> {
     }
 
     /// Retrieves the marketing type of the device.
-    pub async fn get_device_type(&self) -> Result<DeviceType, Hidpp20Error<T::Error>> {
+    pub async fn get_device_type(&self) -> Result<DeviceType, Hidpp20Error> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(

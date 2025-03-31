@@ -3,7 +3,7 @@
 use std::fmt::Debug;
 
 use crate::{
-    channel::{ChannelError, HidppChannel, RawHidChannel},
+    channel::{ChannelError, HidppChannel},
     nibble::{self, U4},
 };
 
@@ -44,10 +44,10 @@ pub enum ProtocolVersion {
 /// Tries to determine the protocol version of a specific device.
 ///
 /// Returns `Ok(None)` if no device was found for the given device index.
-pub async fn determine_version<T: RawHidChannel>(
-    chan: &HidppChannel<T>,
+pub async fn determine_version(
+    chan: &HidppChannel,
     device_index: u8,
-) -> Result<Option<ProtocolVersion>, ChannelError<T::Error>> {
+) -> Result<Option<ProtocolVersion>, ChannelError> {
     // To determine the protocol version, we send a HID++2.0 ping message
     // feature with index 0x00, function 0x01).
     // Devices supporting protocol >=2.0 will respond with a defined response

@@ -1,18 +1,9 @@
 //! Implements functionality specific to HID++2.0.
 
-use std::error::Error;
-
 use thiserror::Error;
 
 use crate::{
-    channel::{
-        ChannelError,
-        HidppChannel,
-        HidppMessage,
-        LONG_REPORT_LENGTH,
-        RawHidChannel,
-        SHORT_REPORT_LENGTH,
-    },
+    channel::{ChannelError, HidppChannel, HidppMessage, LONG_REPORT_LENGTH, SHORT_REPORT_LENGTH},
     nibble::{self, U4},
 };
 
@@ -119,13 +110,13 @@ impl From<Message> for HidppMessage {
     }
 }
 
-impl<T: RawHidChannel> HidppChannel<T> {
+impl HidppChannel {
     /// Sends a HID++2.0 message across the channel and waits for a response
     /// that matches the message header.
     ///
     /// This method simply calls [`Self::send`] with a pre-built response
     /// predicate comparing the headers of the outgoing and incoming message.
-    pub async fn send_v20(&self, msg: Message) -> Result<Message, Hidpp20Error<T::Error>> {
+    pub async fn send_v20(&self, msg: Message) -> Result<Message, Hidpp20Error> {
         let header = msg.header();
 
         let response = Message::from(
@@ -212,11 +203,11 @@ impl From<ErrorType> for u8 {
 
 /// Represents an error that may occur when calling a HID++2.0 feature function.
 #[derive(Debug, Error)]
-pub enum Hidpp20Error<T: Error> {
+pub enum Hidpp20Error {
     /// Indicates that an error occurred while communicating across the HID++
     /// channel.
     #[error("the HID++ channel returned an error")]
-    Channel(#[from] ChannelError<T>),
+    Channel(#[from] ChannelError),
 
     /// Indicates that a call to a HID++2.0 feature function resulted in an
     /// error.

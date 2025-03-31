@@ -118,7 +118,7 @@ pub enum MessageType {
     GetLongRegister = 0x83,
 
     /// Used to indicate an error response. The error code usually included in
-    /// the message can be mapped using [`Error::from_code`].
+    /// the message can be mapped using [`ErrorType::from`].
     Error = 0x8f,
 }
 

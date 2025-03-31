@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::{
-    channel::{HidppChannel, RawHidChannel},
+    channel::HidppChannel,
     feature::{CreatableFeature, Feature, FeatureType},
     nibble::U4,
     protocol::v20::{self, Hidpp20Error},
@@ -19,9 +19,9 @@ use crate::{
 /// [`Self::get_feature`] for every `i in 1..=count` (1-based, as accessing the
 /// root feature is not allowed).
 #[derive(Clone)]
-pub struct FeatureSetFeatureV0<T: RawHidChannel> {
+pub struct FeatureSetFeatureV0 {
     /// The underlying HID++ channel.
-    chan: Arc<HidppChannel<T>>,
+    chan: Arc<HidppChannel>,
 
     /// The index of the device to implement the feature for.
     device_index: u8,
@@ -30,11 +30,11 @@ pub struct FeatureSetFeatureV0<T: RawHidChannel> {
     feature_index: u8,
 }
 
-impl<T: RawHidChannel> CreatableFeature<T> for FeatureSetFeatureV0<T> {
+impl CreatableFeature for FeatureSetFeatureV0 {
     const ID: u16 = 0x0001;
     const STARTING_VERSION: u8 = 0;
 
-    fn new(chan: Arc<HidppChannel<T>>, device_index: u8, feature_index: u8) -> Self {
+    fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
         Self {
             chan,
             device_index,
@@ -43,13 +43,13 @@ impl<T: RawHidChannel> CreatableFeature<T> for FeatureSetFeatureV0<T> {
     }
 }
 
-impl<T: RawHidChannel> Feature<T> for FeatureSetFeatureV0<T> {
+impl Feature for FeatureSetFeatureV0 {
 }
 
-impl<T: RawHidChannel> FeatureSetFeatureV0<T> {
+impl FeatureSetFeatureV0 {
     /// Retrieves the amount of features supported by the device, not including
     /// the root feature.
-    pub async fn count(&self) -> Result<u8, Hidpp20Error<T::Error>> {
+    pub async fn count(&self) -> Result<u8, Hidpp20Error> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
@@ -70,10 +70,7 @@ impl<T: RawHidChannel> FeatureSetFeatureV0<T> {
     /// the feature table.
     ///
     /// Feature index `0` for the root feature is not allowed.
-    pub async fn get_feature(
-        &self,
-        index: u8,
-    ) -> Result<FeatureInformation, Hidpp20Error<T::Error>> {
+    pub async fn get_feature(&self, index: u8) -> Result<FeatureInformation, Hidpp20Error> {
         let response = self
             .chan
             .send_v20(v20::Message::Short(
@@ -98,7 +95,7 @@ impl<T: RawHidChannel> FeatureSetFeatureV0<T> {
 }
 
 /// Represents information about a specific feature as returned by the
-/// [`RootFeature::get_feature`] function.
+/// [`FeatureSetFeatureV0::get_feature`] function.
 #[derive(Clone, Copy, Hash, Debug)]
 pub struct FeatureInformation {
     /// The protocol ID of the feature.
