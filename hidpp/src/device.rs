@@ -137,11 +137,11 @@ impl Device {
             return Ok(None);
         };
 
-        feature::add_implementation(
+        feature::add(
             self,
-            feature_set_info.index,
             FeatureSetFeatureV0::ID,
             feature_set_info.version,
+            feature_set_info.index,
         );
 
         let Some(feature_set_feature) = self.get_feature::<FeatureSetFeatureV0>() else {
@@ -158,7 +158,7 @@ impl Device {
                 continue;
             }
 
-            feature::add_implementation(self, i, info.id, info.version);
+            feature::add(self, info.id, info.version, i);
         }
 
         Ok(Some(features))

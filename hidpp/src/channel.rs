@@ -430,7 +430,7 @@ impl HidppChannel {
 #[derive(Debug, Error)]
 pub enum ChannelError {
     /// Indicates that the concrete implementation of [`RawHidChannel`] returned
-    /// an error of type [`RawHidChannel::Error`].
+    /// an error.
     #[error("the HID channel implementation returned an error")]
     Implementation(#[from] Box<dyn Error>),
 

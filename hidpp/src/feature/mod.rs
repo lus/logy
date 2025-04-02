@@ -90,31 +90,37 @@ impl From<FeatureType> for u8 {
     }
 }
 
-/// Adds a default feature implementation to a device based on its ID and
-/// version.
-///
-/// Returns whether an implementation exists and thus was added or not.
-///
-/// This does NOT check whether the device actually supports the feature.
-pub fn add_implementation(dev: &mut Device, index: u8, id: u16, version: u8) -> bool {
-    [
-        maybe_add_implementation::<FeatureSetFeatureV0>(dev, id, index, version),
-        maybe_add_implementation::<DeviceTypeAndNameFeatureV0>(dev, id, index, version),
-    ]
-    .iter()
-    .any(|elem| *elem)
+macro_rules! add_features {
+    ($device:ident, $id:ident, $version:ident, $index:ident, { $typ:ty, $($types:ty),+ }) => {
+        matching_add::<$typ>($device, $id, $version, $index);
+        add_features!($device, $id, $version, $index, {$($types),+});
+    };
+
+    ($device:ident, $id:ident, $version:ident, $index:ident, { $typ:ty }) => {
+        matching_add::<$typ>($device, $id, $version, $index);
+    };
 }
 
-fn maybe_add_implementation<F: CreatableFeature>(
-    dev: &mut Device,
-    id: u16,
-    index: u8,
-    version: u8,
-) -> bool {
-    if id != F::ID || version < F::STARTING_VERSION {
-        return false;
+/// Adds all default feature implementations to a device that support the given
+/// parameters.
+pub fn add(device: &mut Device, feature_id: u16, feature_version: u8, feature_index: u8) {
+    add_features!(device, feature_id, feature_version, feature_index, {
+        FeatureSetFeatureV0,
+        DeviceTypeAndNameFeatureV0
+    });
+}
+
+/// Adds a feature implementation to a device only if it supports the ID and
+/// version.
+pub fn matching_add<F: CreatableFeature>(
+    device: &mut Device,
+    feature_id: u16,
+    feature_version: u8,
+    feature_index: u8,
+) {
+    if feature_id != F::ID || feature_version < F::STARTING_VERSION {
+        return;
     }
 
-    dev.add_feature::<F>(index);
-    true
+    device.add_feature::<F>(feature_index);
 }
