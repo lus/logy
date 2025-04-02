@@ -3,7 +3,7 @@
 //! This includes mapping incoming messages to previously sent requests.
 
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     error::Error,
     sync::{
         Arc,
@@ -16,6 +16,7 @@ use std::{
 use async_trait::async_trait;
 use futures::{FutureExt, channel::oneshot, select};
 use hidreport::{Field, Report, ReportDescriptor, Usage, UsageId, UsagePage};
+use rand::Rng;
 use thiserror::Error;
 
 use crate::nibble::U4;
@@ -221,6 +222,10 @@ pub struct HidppChannel {
     /// All sent messages that are waiting for a response.
     pending_messages: Arc<Mutex<VecDeque<PendingMessage>>>,
 
+    /// Registered listeners that will receive notifications about incoming
+    /// messages.
+    message_listeners: Arc<Mutex<HashMap<u32, MessageListener>>>,
+
     /// The sender signaling the read thread to stop.
     read_thread_close: Option<oneshot::Sender<()>>,
 
@@ -256,6 +261,12 @@ struct PendingMessage {
     sender: oneshot::Sender<HidppMessage>,
 }
 
+/// Represents a listener that is called for every incoming message.
+///
+/// The boolean passed to the listener indicates whether the message was already
+/// matched as a response to a previous outgoing message.
+pub type MessageListener = fn(HidppMessage, bool);
+
 impl HidppChannel {
     /// Tries to construct a HID++ channel from a raw HID channel.
     ///
@@ -270,12 +281,14 @@ impl HidppChannel {
 
         let raw_channel_rc = Arc::new(raw);
         let pending_messages_rc = Arc::new(Mutex::new(VecDeque::<PendingMessage>::new()));
+        let message_listeners_rc = Arc::new(Mutex::new(HashMap::<u32, MessageListener>::new()));
 
         let (close_sender, mut close_receiver) = oneshot::channel::<()>();
 
         let read_thread_hdl = thread::spawn({
             let raw_channel = Arc::clone(&raw_channel_rc);
             let pending_messages = Arc::clone(&pending_messages_rc);
+            let message_listeners = Arc::clone(&message_listeners_rc);
 
             move || {
                 futures::executor::block_on(async {
@@ -297,16 +310,18 @@ impl HidppChannel {
                             continue;
                         };
 
-                        let Ok(mut guard) = pending_messages.lock() else {
-                            continue;
-                        };
-
-                        if let Some(pos) = guard
-                            .iter()
-                            .position(|elem| (elem.response_predicate)(&msg))
+                        let mut msgs = pending_messages.lock().unwrap();
+                        let mut matched = false;
+                        if let Some(pos) =
+                            msgs.iter().position(|elem| (elem.response_predicate)(&msg))
                         {
-                            let waiting = guard.remove(pos).unwrap();
+                            let waiting = msgs.remove(pos).unwrap();
                             let _ = waiting.sender.send(msg);
+                            matched = true;
+                        }
+
+                        for listener in message_listeners.lock().unwrap().values() {
+                            listener(msg, matched);
                         }
                     }
                 });
@@ -320,6 +335,7 @@ impl HidppChannel {
             rotate_software_id: AtomicBool::new(false),
             software_id: AtomicU8::new(0x01),
             pending_messages: pending_messages_rc,
+            message_listeners: message_listeners_rc,
             read_thread_close: Some(close_sender),
             read_thread_hdl: Some(read_thread_hdl),
         })
@@ -422,6 +438,34 @@ impl HidppChannel {
             .await
             .map(|_| ())
             .map_err(ChannelError::Implementation)
+    }
+
+    /// Registers a listener that will be called for every incoming message.
+    ///
+    /// Returns a handle that can be used to remove the listener using a call to
+    /// [`Self::remove_msg_listener`].
+    pub fn add_msg_listener(&self, listener: MessageListener) -> u32 {
+        let mut listeners = self.message_listeners.lock().unwrap();
+
+        let mut rng = rand::rng();
+        let mut hdl = rng.random::<u32>();
+        while listeners.contains_key(&hdl) {
+            hdl = rng.random::<u32>();
+        }
+
+        listeners.insert(hdl, listener);
+        hdl
+    }
+
+    /// Removes a previously registered message listener.
+    ///
+    /// Returns whether a listener was found using the given handle.
+    pub fn remove_msg_listener(&self, hdl: u32) -> bool {
+        self.message_listeners
+            .lock()
+            .unwrap()
+            .remove(&hdl)
+            .is_some()
     }
 }
 
