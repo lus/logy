@@ -139,6 +139,7 @@ dependencies = [
  "async-trait",
  "futures",
  "hidreport",
+ "lazy_static",
  "rand",
  "thiserror 2.0.12",
 ]
@@ -161,6 +162,12 @@ checksum = "4a6847b91daf99e3afce87a66f4c8e371776f4567e4e3f9ef48705baaca09795"
 dependencies = [
  "thiserror 1.0.69",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"

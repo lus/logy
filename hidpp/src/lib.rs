@@ -1,7 +1,7 @@
 //! An implementation of Logitech's HID++ protocol.
 //!
 //! Many of Logitech's more modern peripheral devices (mice, keyboards etc.)
-//! support advanced features increasing the user experience. These include, but
+//! support advanced features improving the user experience. These include, but
 //! are not limited to, things like:
 //!
 //! - scroll wheels dynamically switching between ratchet and freespin mode ([SmartShift](https://support.logi.com/hc/en-us/articles/360052340194-What-is-SmartShift-on-MX-Anywhere-3))

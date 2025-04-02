@@ -124,7 +124,7 @@ impl Device {
     }
 
     /// Tries to detect all features supported by the device and add
-    /// implementations for them using [`feature::add_implementation`].
+    /// implementations for them using [`feature::registry::lookup_version`].
     ///
     /// Returns a vector containing all feature IDs supported by the device.
     ///
@@ -137,16 +137,7 @@ impl Device {
             return Ok(None);
         };
 
-        feature::add(
-            self,
-            FeatureSetFeatureV0::ID,
-            feature_set_info.version,
-            feature_set_info.index,
-        );
-
-        let Some(feature_set_feature) = self.get_feature::<FeatureSetFeatureV0>() else {
-            return Ok(None);
-        };
+        let feature_set_feature = self.add_feature::<FeatureSetFeatureV0>(feature_set_info.index);
 
         let count = feature_set_feature.count().await?;
         let mut features = Vec::with_capacity(count as usize);
@@ -158,7 +149,16 @@ impl Device {
                 continue;
             }
 
-            feature::add(self, info.id, info.version, i);
+            let Some(impls) = feature::registry::lookup_version(info.id, info.version) else {
+                continue;
+            };
+
+            for feat_impl in impls {
+                let (type_id, instance) =
+                    (feat_impl.producer)(Arc::clone(&self.chan), self.device_index, i);
+
+                self.features.insert(type_id, instance);
+            }
         }
 
         Ok(Some(features))

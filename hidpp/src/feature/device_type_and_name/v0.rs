@@ -128,6 +128,8 @@ impl DeviceTypeAndNameFeatureV0 {
     }
 }
 
+/// Represents the type of a HID++2.0 device as returned by the
+/// [`DeviceTypeAndNameFeatureV0`] feature.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum DeviceType {
     Keyboard,
