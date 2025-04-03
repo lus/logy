@@ -10,6 +10,7 @@ use crate::{
     channel::HidppChannel,
     feature::{
         CreatableFeature,
+        device_friendly_name::v0::DeviceFriendlyNameFeatureV0,
         device_information::v0::DeviceInformationFeatureV0,
         device_type_and_name::v0::DeviceTypeAndNameFeatureV0,
         feature_set::v0::FeatureSetFeatureV0,
@@ -121,7 +122,10 @@ lazy_static! {
         }),
         (0x0007, KnownFeature {
             name: "DeviceFriendlyName",
-            versions: &[]
+            versions: &[FeatureVersion {
+                starting_version: DeviceFriendlyNameFeatureV0::STARTING_VERSION,
+                producer: new_dyn::<DeviceFriendlyNameFeatureV0>
+            }]
         }),
         (0x0008, KnownFeature {
             name: "KeepAlive",

@@ -1,6 +1,6 @@
 //! Implements the feature starting with version 0.
 
-use std::{cmp::min, sync::Arc};
+use std::sync::Arc;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -69,7 +69,7 @@ impl DeviceTypeAndNameFeatureV0 {
     ///
     /// Use this function in conjunction with [`Self::get_device_name_count`] to
     /// retrieve the whole device name.\
-    /// A convenience wrapper implementing this functionality is provided under
+    /// A convenience wrapper implementing this functionality is provided as
     /// [`Self::get_whole_device_name`].
     pub async fn get_device_name(&self, index: u8) -> Result<Vec<u8>, Hidpp20Error> {
         let response = self
@@ -101,11 +101,7 @@ impl DeviceTypeAndNameFeatureV0 {
         let mut len = 0;
         while len < count as usize {
             let part = self.get_device_name(len as u8).await?;
-            string.push_str(
-                str::from_utf8(&part[..min(part.len(), count as usize - len)])
-                    .map_err(|_| Hidpp20Error::UnsupportedResponse)?,
-            );
-
+            string.push_str(str::from_utf8(&part).map_err(|_| Hidpp20Error::UnsupportedResponse)?);
             len = string.len();
         }
 

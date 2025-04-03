@@ -7,6 +7,7 @@ use std::{
 
 use crate::channel::HidppChannel;
 
+pub mod device_friendly_name;
 pub mod device_information;
 pub mod device_type_and_name;
 pub mod feature_set;
