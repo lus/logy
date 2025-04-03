@@ -2,6 +2,8 @@
 
 use std::sync::{Arc, Mutex, mpsc};
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+
 use crate::{
     channel::HidppChannel,
     feature::{CreatableFeature, EmittingFeature, Feature},
@@ -17,7 +19,7 @@ pub struct WirelessDeviceStatusFeatureV0 {
     chan: Arc<HidppChannel>,
 
     /// A collection of event listeners added via [`Self::listen`].
-    listeners: Arc<Mutex<Vec<mpsc::Sender<WirelessDeviceStatusEvent>>>>,
+    listeners: Arc<Mutex<Vec<mpsc::Sender<WirelessDeviceStatusBroadcastEvent>>>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -30,9 +32,9 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let listeners_rc = Arc::new(Mutex::new(
-            Vec::<mpsc::Sender<WirelessDeviceStatusEvent>>::new(),
-        ));
+        let listeners_rc = Arc::new(Mutex::new(Vec::<
+            mpsc::Sender<WirelessDeviceStatusBroadcastEvent>,
+        >::new()));
 
         let hdl = chan.add_msg_listener({
             let listeners = Arc::clone(&listeners_rc);
@@ -53,16 +55,23 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
                 }
 
                 let payload = msg.extend_payload();
+                let Ok(status) = WirelessDeviceStatus::try_from(payload[0]) else {
+                    return;
+                };
+                let Ok(request) = WirelessDeviceStatusRequest::try_from(payload[1]) else {
+                    return;
+                };
+                let Ok(reason) = WirelessDeviceStatusReason::try_from(payload[2]) else {
+                    return;
+                };
 
                 listeners.lock().unwrap().retain(|listener| {
                     listener
-                        .send(WirelessDeviceStatusEvent::StatusBroadcast(
-                            WirelessDeviceStatusBroadcastEvent {
-                                status: WirelessDeviceStatus::from(payload[0]),
-                                request: WirelessDeviceStatusRequest::from(payload[1]),
-                                reason: WirelessDeviceStatusReason::from(payload[2]),
-                            },
-                        ))
+                        .send(WirelessDeviceStatusBroadcastEvent {
+                            status,
+                            request,
+                            reason,
+                        })
                         .is_ok()
                 });
             }
@@ -79,9 +88,9 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
 impl Feature for WirelessDeviceStatusFeatureV0 {
 }
 
-impl EmittingFeature<WirelessDeviceStatusEvent> for WirelessDeviceStatusFeatureV0 {
-    fn listen(&self) -> mpsc::Receiver<WirelessDeviceStatusEvent> {
-        let (tx, rx) = mpsc::channel::<WirelessDeviceStatusEvent>();
+impl EmittingFeature<WirelessDeviceStatusBroadcastEvent> for WirelessDeviceStatusFeatureV0 {
+    fn listen(&self) -> mpsc::Receiver<WirelessDeviceStatusBroadcastEvent> {
+        let (tx, rx) = mpsc::channel::<WirelessDeviceStatusBroadcastEvent>();
         self.listeners.lock().unwrap().push(tx);
         rx
     }
@@ -93,18 +102,12 @@ impl Drop for WirelessDeviceStatusFeatureV0 {
     }
 }
 
-/// Represents any event emitted by the [`WirelessDeviceStatusFeatureV0`]
-/// feature.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum WirelessDeviceStatusEvent {
-    StatusBroadcast(WirelessDeviceStatusBroadcastEvent),
-}
-
 /// Represents the event that a device sends whenever it (re)connects to the
 /// host.
 ///
 /// This event is always enabled.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct WirelessDeviceStatusBroadcastEvent {
     /// The status the device reports to be in.
     pub status: WirelessDeviceStatus,
@@ -118,59 +121,30 @@ pub struct WirelessDeviceStatusBroadcastEvent {
 
 /// Represents a device status as reported in
 /// [`WirelessDeviceStatusBroadcastEvent::status`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum WirelessDeviceStatus {
     Unknown = 0x00,
     Reconnection = 0x01,
-    Reserved,
-}
-
-impl From<u8> for WirelessDeviceStatus {
-    fn from(value: u8) -> Self {
-        match value {
-            x if x == Self::Unknown as u8 => Self::Unknown,
-            x if x == Self::Reconnection as u8 => Self::Reconnection,
-            _ => Self::Reserved,
-        }
-    }
 }
 
 /// Represents a request as reported in
 /// [`WirelessDeviceStatusBroadcastEvent::request`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum WirelessDeviceStatusRequest {
     NoRequest = 0x00,
     SoftwareReconfigurationNeeded = 0x01,
-    Reserved,
-}
-
-impl From<u8> for WirelessDeviceStatusRequest {
-    fn from(value: u8) -> Self {
-        match value {
-            x if x == Self::NoRequest as u8 => Self::NoRequest,
-            x if x == Self::SoftwareReconfigurationNeeded as u8 => {
-                Self::SoftwareReconfigurationNeeded
-            },
-            _ => Self::Reserved,
-        }
-    }
 }
 
 /// Represents a broadcast reason as reported in
 /// [`WirelessDeviceStatusBroadcastEvent::reason`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum WirelessDeviceStatusReason {
     Unknown = 0x00,
     PowerSwitchActivated = 0x01,
-    Reserved,
-}
-
-impl From<u8> for WirelessDeviceStatusReason {
-    fn from(value: u8) -> Self {
-        match value {
-            x if x == Self::Unknown as u8 => Self::Unknown,
-            x if x == Self::PowerSwitchActivated as u8 => Self::PowerSwitchActivated,
-            _ => Self::Reserved,
-        }
-    }
 }

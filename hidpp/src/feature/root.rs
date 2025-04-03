@@ -103,6 +103,7 @@ impl RootFeature {
 /// Represents information about a specific feature as returned by the
 /// [`RootFeature::get_feature`] function.
 #[derive(Clone, Copy, Hash, Debug)]
+#[non_exhaustive]
 pub struct FeatureInformation {
     /// The index of the feature in the version table.
     /// This is used for invocations of functions of that feature.

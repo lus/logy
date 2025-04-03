@@ -2,6 +2,8 @@
 
 use std::{cmp::min, sync::Arc};
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+
 use crate::{
     channel::HidppChannel,
     feature::{CreatableFeature, Feature},
@@ -124,89 +126,35 @@ impl DeviceTypeAndNameFeatureV0 {
             ))
             .await?;
 
-        Ok(DeviceType::from(response.extend_payload()[0]))
+        DeviceType::try_from(response.extend_payload()[0])
+            .map_err(|_| Hidpp20Error::UnsupportedResponse)
     }
 }
 
 /// Represents the type of a HID++2.0 device as returned by the
 /// [`DeviceTypeAndNameFeatureV0`] feature.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum DeviceType {
-    Keyboard,
-    RemoteControl,
-    Numpad,
-    Mouse,
-    Trackpad,
-    Trackball,
-    Presenter,
-    Receiver,
-    Headset,
-    Webcam,
-    SteeringWheel,
-    Joystick,
-    Gamepad,
-    Dock,
-    Speaker,
-    Microphone,
-    IlluminationLight,
-    ProgrammableController,
-    CarSimPedals,
-    Adapter,
-    Other(u8),
-}
-
-impl From<u8> for DeviceType {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Self::Keyboard,
-            1 => Self::RemoteControl,
-            2 => Self::Numpad,
-            3 => Self::Mouse,
-            4 => Self::Trackpad,
-            5 => Self::Trackball,
-            6 => Self::Presenter,
-            7 => Self::Receiver,
-            8 => Self::Headset,
-            9 => Self::Webcam,
-            10 => Self::SteeringWheel,
-            11 => Self::Joystick,
-            12 => Self::Gamepad,
-            13 => Self::Dock,
-            14 => Self::Speaker,
-            15 => Self::Microphone,
-            16 => Self::IlluminationLight,
-            17 => Self::ProgrammableController,
-            18 => Self::CarSimPedals,
-            19 => Self::Adapter,
-            code => Self::Other(code),
-        }
-    }
-}
-
-impl From<DeviceType> for u8 {
-    fn from(value: DeviceType) -> Self {
-        match value {
-            DeviceType::Keyboard => 0,
-            DeviceType::RemoteControl => 1,
-            DeviceType::Numpad => 2,
-            DeviceType::Mouse => 3,
-            DeviceType::Trackpad => 4,
-            DeviceType::Trackball => 5,
-            DeviceType::Presenter => 6,
-            DeviceType::Receiver => 7,
-            DeviceType::Headset => 8,
-            DeviceType::Webcam => 9,
-            DeviceType::SteeringWheel => 10,
-            DeviceType::Joystick => 11,
-            DeviceType::Gamepad => 12,
-            DeviceType::Dock => 13,
-            DeviceType::Speaker => 14,
-            DeviceType::Microphone => 15,
-            DeviceType::IlluminationLight => 16,
-            DeviceType::ProgrammableController => 17,
-            DeviceType::CarSimPedals => 18,
-            DeviceType::Adapter => 19,
-            DeviceType::Other(code) => code,
-        }
-    }
+    Keyboard = 0,
+    RemoteControl = 1,
+    Numpad = 2,
+    Mouse = 3,
+    Trackpad = 4,
+    Trackball = 5,
+    Presenter = 6,
+    Receiver = 7,
+    Headset = 8,
+    Webcam = 9,
+    SteeringWheel = 10,
+    Joystick = 11,
+    Gamepad = 12,
+    Dock = 13,
+    Speaker = 14,
+    Microphone = 15,
+    IlluminationLight = 16,
+    ProgrammableController = 17,
+    CarSimPedals = 18,
+    Adapter = 19,
 }

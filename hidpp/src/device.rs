@@ -167,6 +167,7 @@ impl Device {
 
 /// Represents a device-specific error.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum DeviceError {
     /// Indicates that the underlying [`HidppChannel`] returned an error.
     #[error("the HID++ channel returned an error")]

@@ -43,6 +43,7 @@ pub trait EmittingFeature<T>: Feature {
 ///
 /// Documentation is taken from <https://drive.google.com/file/d/1ULmw9uJL8b8iwwUo5xjSS9F5Zvno-86y/view>.
 #[derive(Clone, Copy, Hash, Debug)]
+#[non_exhaustive]
 pub struct FeatureType {
     /// An obsolete feature is a feature that has been replaced by a newer one,
     /// but is advertised in order for older SWs to still be able to support the

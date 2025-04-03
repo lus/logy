@@ -1,5 +1,7 @@
 //! Implements functionality specific to HID++1.0.
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+
 use crate::channel::{HidppMessage, LONG_REPORT_LENGTH, SHORT_REPORT_LENGTH};
 
 /// Represents the header that every [`HidppMessage`] of HID++1.0 starts with.
@@ -95,7 +97,9 @@ impl From<Message> for HidppMessage {
 /// This enum only includes sub IDs that are defined globally across all
 /// devices. Most devices (e.g. the Unifying Receiver) define additional sub IDs
 /// specific to their functionality.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum MessageType {
     /// Used to set a 3-byte register value. A sent message of this type is
     /// usually responded with a response message of the same type (or
@@ -122,29 +126,6 @@ pub enum MessageType {
     Error = 0x8f,
 }
 
-impl TryFrom<u8> for MessageType {
-    type Error = ();
-
-    fn try_from(
-        value: u8,
-    ) -> Result<Self, <crate::protocol::v10::MessageType as TryFrom<u8>>::Error> {
-        match value {
-            x if x == Self::SetRegister as u8 => Ok(Self::SetRegister),
-            x if x == Self::GetRegister as u8 => Ok(Self::GetRegister),
-            x if x == Self::SetLongRegister as u8 => Ok(Self::SetLongRegister),
-            x if x == Self::GetLongRegister as u8 => Ok(Self::GetLongRegister),
-            x if x == Self::Error as u8 => Ok(Self::Error),
-            _ => Err(()),
-        }
-    }
-}
-
-impl From<MessageType> for u8 {
-    fn from(value: MessageType) -> Self {
-        value as u8
-    }
-}
-
 /// Represents the type of an error a HID++1.0 device returns as part of a
 /// message with the [`MessageType::Error`] type.
 ///
@@ -153,7 +134,9 @@ impl From<MessageType> for u8 {
 ///
 /// Error codes `0x0D..=0xFF` are defined as reserved values and are merged into
 /// the [`Self::Reserved`] variant.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum ErrorType {
     /// No error.
     Success = 0x00,
@@ -200,39 +183,4 @@ pub enum ErrorType {
 
     /// The PIN code a device was wrong.
     WrongPinCode = 0x0c,
-
-    /// An error code in the range `0x0D..=0xFF`.
-    Reserved,
-}
-
-impl From<u8> for ErrorType {
-    fn from(value: u8) -> Self {
-        match value {
-            x if x == Self::Success as u8 => Self::Success,
-            x if x == Self::InvalidSubId as u8 => Self::InvalidSubId,
-            x if x == Self::InvalidAddress as u8 => Self::InvalidAddress,
-            x if x == Self::InvalidValue as u8 => Self::InvalidValue,
-            x if x == Self::ConnectFail as u8 => Self::ConnectFail,
-            x if x == Self::TooManyDevices as u8 => Self::TooManyDevices,
-            x if x == Self::AlreadyExists as u8 => Self::AlreadyExists,
-            x if x == Self::Busy as u8 => Self::Busy,
-            x if x == Self::UnknownDevice as u8 => Self::UnknownDevice,
-            x if x == Self::ResourceError as u8 => Self::ResourceError,
-            x if x == Self::RequestUnavailable as u8 => Self::RequestUnavailable,
-            x if x == Self::InvalidParamValue as u8 => Self::InvalidParamValue,
-            x if x == Self::WrongPinCode as u8 => Self::WrongPinCode,
-            _ => Self::Reserved,
-        }
-    }
-}
-
-impl TryFrom<ErrorType> for u8 {
-    type Error = ();
-
-    fn try_from(value: ErrorType) -> Result<Self, Self::Error> {
-        match value {
-            ErrorType::Reserved => Err(()),
-            _ => Ok(value as u8),
-        }
-    }
 }

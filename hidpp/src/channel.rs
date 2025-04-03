@@ -468,6 +468,7 @@ impl HidppChannel {
 /// Represents an error that occurred when creating or interacting with a HID or
 /// HID++ communication channel.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ChannelError {
     /// Indicates that the concrete implementation of [`RawHidChannel`] returned
     /// an error.

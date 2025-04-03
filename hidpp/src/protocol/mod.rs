@@ -105,7 +105,7 @@ pub async fn determine_version(
         return Ok(None);
     };
 
-    if payload[2] == v10::ErrorType::InvalidSubId.try_into().unwrap() {
+    if payload[2] == v10::ErrorType::InvalidSubId.into() {
         Ok(Some(ProtocolVersion::V10))
     } else {
         Ok(None)

@@ -97,6 +97,7 @@ impl FeatureSetFeatureV0 {
 /// Represents information about a specific feature as returned by the
 /// [`FeatureSetFeatureV0::get_feature`] function.
 #[derive(Clone, Copy, Hash, Debug)]
+#[non_exhaustive]
 pub struct FeatureInformation {
     /// The protocol ID of the feature.
     pub id: u16,

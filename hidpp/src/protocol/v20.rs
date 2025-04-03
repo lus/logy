@@ -1,5 +1,6 @@
 //! Implements functionality specific to HID++2.0.
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use thiserror::Error;
 
 use crate::{
@@ -139,9 +140,10 @@ impl HidppChannel {
         );
 
         if response.header().feature_index == 0xff {
-            return Err(Hidpp20Error::Feature(ErrorType::from(
-                response.extend_payload()[1],
-            )));
+            let err = ErrorType::try_from(response.extend_payload()[1])
+                .map_err(|_| Hidpp20Error::UnsupportedResponse)?;
+
+            return Err(Hidpp20Error::Feature(err));
         }
 
         Ok(response)
@@ -150,59 +152,25 @@ impl HidppChannel {
 
 /// Represents the type of an error a HID++2.0 device returns if a feature
 /// function fails.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum ErrorType {
-    NoError,
-    Unknown,
-    InvalidArgument,
-    OutOfRange,
-    HwError,
-    LogitechInternal,
-    InvalidFeatureIndex,
-    InvalidFunctionId,
-    Busy,
-    Unsupported,
-    Other(u8),
-}
-
-impl From<u8> for ErrorType {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Self::NoError,
-            1 => Self::Unknown,
-            2 => Self::InvalidArgument,
-            3 => Self::OutOfRange,
-            4 => Self::HwError,
-            5 => Self::LogitechInternal,
-            6 => Self::InvalidFeatureIndex,
-            7 => Self::InvalidFunctionId,
-            8 => Self::Busy,
-            9 => Self::Unsupported,
-            _ => Self::Other(value),
-        }
-    }
-}
-
-impl From<ErrorType> for u8 {
-    fn from(value: ErrorType) -> Self {
-        match value {
-            ErrorType::NoError => 0,
-            ErrorType::Unknown => 1,
-            ErrorType::InvalidArgument => 2,
-            ErrorType::OutOfRange => 3,
-            ErrorType::HwError => 4,
-            ErrorType::LogitechInternal => 5,
-            ErrorType::InvalidFeatureIndex => 6,
-            ErrorType::InvalidFunctionId => 7,
-            ErrorType::Busy => 8,
-            ErrorType::Unsupported => 9,
-            ErrorType::Other(code) => code,
-        }
-    }
+    NoError = 0,
+    Unknown = 1,
+    InvalidArgument = 2,
+    OutOfRange = 3,
+    HwError = 4,
+    LogitechInternal = 5,
+    InvalidFeatureIndex = 6,
+    InvalidFunctionId = 7,
+    Busy = 8,
+    Unsupported = 9,
 }
 
 /// Represents an error that may occur when calling a HID++2.0 feature function.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Hidpp20Error {
     /// Indicates that an error occurred while communicating across the HID++
     /// channel.
@@ -213,4 +181,8 @@ pub enum Hidpp20Error {
     /// error.
     #[error("a HID++2.0 feature returned an error")]
     Feature(ErrorType),
+
+    /// Indicates that a response received is not fully supported.
+    #[error("the response received from the device is (partly) unsupported")]
+    UnsupportedResponse,
 }
