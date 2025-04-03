@@ -13,6 +13,7 @@ use crate::{
         device_type_and_name::v0::DeviceTypeAndNameFeatureV0,
         feature_set::v0::FeatureSetFeatureV0,
         root::RootFeature,
+        wireless_device_status::v0::WirelessDeviceStatusFeatureV0,
     },
 };
 
@@ -247,7 +248,10 @@ lazy_static! {
         }),
         (0x1d4b, KnownFeature {
             name: "WirelessDeviceStatus",
-            versions: &[]
+            versions: &[FeatureVersion {
+                starting_version: WirelessDeviceStatusFeatureV0::STARTING_VERSION,
+                producer: new_dyn::<WirelessDeviceStatusFeatureV0>
+            }]
         }),
         (0x1df0, KnownFeature {
             name: "RemainingPairings",

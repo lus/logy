@@ -202,6 +202,8 @@ impl HidppMessage {
     }
 }
 
+type MessageListener = Box<dyn Fn(HidppMessage, bool) + Send>;
+
 /// Represents a HID communication channel supporting HID++.
 pub struct HidppChannel {
     /// Whether the channel supports short (7 bytes) HID++ messages.
@@ -260,12 +262,6 @@ struct PendingMessage {
     /// end.
     sender: oneshot::Sender<HidppMessage>,
 }
-
-/// Represents a listener that is called for every incoming message.
-///
-/// The boolean passed to the listener indicates whether the message was already
-/// matched as a response to a previous outgoing message.
-pub type MessageListener = fn(HidppMessage, bool);
 
 impl HidppChannel {
     /// Tries to construct a HID++ channel from a raw HID channel.
@@ -444,7 +440,7 @@ impl HidppChannel {
     ///
     /// Returns a handle that can be used to remove the listener using a call to
     /// [`Self::remove_msg_listener`].
-    pub fn add_msg_listener(&self, listener: MessageListener) -> u32 {
+    pub fn add_msg_listener(&self, listener: impl Fn(HidppMessage, bool) + Send + 'static) -> u32 {
         let mut listeners = self.message_listeners.lock().unwrap();
 
         let mut rng = rand::rng();
@@ -453,7 +449,7 @@ impl HidppChannel {
             hdl = rng.random::<u32>();
         }
 
-        listeners.insert(hdl, listener);
+        listeners.insert(hdl, Box::new(listener));
         hdl
     }
 
