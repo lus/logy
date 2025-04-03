@@ -122,18 +122,12 @@ pub enum MessageType {
     GetLongRegister = 0x83,
 
     /// Used to indicate an error response. The error code usually included in
-    /// the message can be mapped using [`ErrorType::from`].
+    /// the message can be mapped using [`ErrorType::try_from`].
     Error = 0x8f,
 }
 
 /// Represents the type of an error a HID++1.0 device returns as part of a
 /// message with the [`MessageType::Error`] type.
-///
-/// Error code `0x00` is defined as success and is thus not really an error nor
-/// included in this enum.
-///
-/// Error codes `0x0D..=0xFF` are defined as reserved values and are merged into
-/// the [`Self::Reserved`] variant.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
 #[non_exhaustive]
 #[repr(u8)]

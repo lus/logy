@@ -18,6 +18,7 @@
 
 pub use async_trait::async_trait;
 
+mod bcd;
 pub mod channel;
 pub mod device;
 pub mod feature;

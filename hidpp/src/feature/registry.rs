@@ -10,6 +10,7 @@ use crate::{
     channel::HidppChannel,
     feature::{
         CreatableFeature,
+        device_information::v0::DeviceInformationFeatureV0,
         device_type_and_name::v0::DeviceTypeAndNameFeatureV0,
         feature_set::v0::FeatureSetFeatureV0,
         root::RootFeature,
@@ -58,7 +59,7 @@ pub fn lookup_version(feature_id: u16, feature_version: u8) -> Option<Vec<Featur
     lookup(feature_id).map(|feat| {
         feat.versions
             .iter()
-            .filter(|&ver| ver.starting_version >= feature_version)
+            .filter(|&ver| ver.starting_version <= feature_version)
             .copied()
             .collect::<Vec<FeatureVersion>>()
     })
@@ -98,7 +99,10 @@ lazy_static! {
         }),
         (0x0003, KnownFeature {
             name: "DeviceInformation",
-            versions: &[]
+            versions: &[FeatureVersion {
+                starting_version: DeviceInformationFeatureV0::STARTING_VERSION,
+                producer: new_dyn::<DeviceInformationFeatureV0>
+            }]
         }),
         (0x0004, KnownFeature {
             name: "UnitId",

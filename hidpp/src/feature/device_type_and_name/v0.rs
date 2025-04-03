@@ -101,9 +101,10 @@ impl DeviceTypeAndNameFeatureV0 {
         let mut len = 0;
         while len < count as usize {
             let part = self.get_device_name(len as u8).await?;
-            string.push_str(unsafe {
-                str::from_utf8_unchecked(&part[..min(part.len(), count as usize - len)])
-            });
+            string.push_str(
+                str::from_utf8(&part[..min(part.len(), count as usize - len)])
+                    .map_err(|_| Hidpp20Error::UnsupportedResponse)?,
+            );
 
             len = string.len();
         }

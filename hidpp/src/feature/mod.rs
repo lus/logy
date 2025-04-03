@@ -7,6 +7,7 @@ use std::{
 
 use crate::channel::HidppChannel;
 
+pub mod device_information;
 pub mod device_type_and_name;
 pub mod feature_set;
 pub mod registry;
@@ -29,10 +30,10 @@ pub trait CreatableFeature: Feature {
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self;
 }
 
-/// Represents a [`Feature`] that emits events of type [`T`].
+/// Represents a [`Feature`] that emits events of type `T`.
 pub trait EmittingFeature<T>: Feature {
     /// Creates a receiver that is being notified whenever a new event of type
-    /// [`T`] is emitted by the feature.
+    /// `T` is emitted by the feature.
     ///
     /// If the receiver is dropped, it is automatically removed from the
     /// internal listener collection as soon as the next event occurs.
