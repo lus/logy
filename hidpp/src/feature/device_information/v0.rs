@@ -230,7 +230,7 @@ impl From<u8> for DeviceTransport {
 pub struct DeviceInformationCapabilities {
     /// Whether serial number retrieval is supported.
     ///
-    /// This field was added in feature version 3 and will always be `false` for
+    /// This field was added in feature version 4 and will always be `false` for
     /// older versions.
     pub serial_number: bool,
 }

@@ -111,5 +111,8 @@ pub struct FeatureInformation {
     /// feature ID does not change, meaning functions implemented for an older
     /// version of the same feature will behave as expected for every later
     /// version.
+    ///
+    /// This field was added in feature version 1 and will be `0` for all older
+    /// versions.
     pub version: u8,
 }

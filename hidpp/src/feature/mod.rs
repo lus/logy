@@ -62,10 +62,16 @@ pub struct FeatureType {
 
     /// A manufacturing feature that can be permanently deactivated. It is
     /// usually also hidden and engineering.
+    ///
+    /// This field was added in feature version 2 and will be `false` for all
+    /// older versions.
     pub manufacturing_deactivatable: bool,
 
     /// A compliance feature that can be permanently deactivated. It is usually
     /// also hidden and engineering.
+    ///
+    /// This field was added in feature version 2 and will be `false` for all
+    /// older versions.
     pub compliance_deactivatable: bool,
 }
 
