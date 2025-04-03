@@ -11,6 +11,7 @@ pub mod device_type_and_name;
 pub mod feature_set;
 pub mod registry;
 pub mod root;
+pub mod thumbwheel;
 pub mod wireless_device_status;
 
 /// Represents a concrete implementation of a HID++2.0 device feature.

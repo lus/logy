@@ -13,6 +13,7 @@ use crate::{
         device_type_and_name::v0::DeviceTypeAndNameFeatureV0,
         feature_set::v0::FeatureSetFeatureV0,
         root::RootFeature,
+        thumbwheel::v0::ThumbwheelFeatureV0,
         wireless_device_status::v0::WirelessDeviceStatusFeatureV0,
     },
 };
@@ -303,7 +304,10 @@ lazy_static! {
         }),
         (0x2150, KnownFeature {
             name: "Thumbwheel",
-            versions: &[]
+            versions: &[FeatureVersion {
+                starting_version: ThumbwheelFeatureV0::STARTING_VERSION,
+                producer: new_dyn::<ThumbwheelFeatureV0>
+            }]
         }),
         (0x2200, KnownFeature {
             name: "MousePointer",
