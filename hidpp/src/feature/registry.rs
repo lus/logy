@@ -16,6 +16,7 @@ use crate::{
         feature_set::v0::FeatureSetFeatureV0,
         root::RootFeature,
         thumbwheel::v0::ThumbwheelFeatureV0,
+        unified_battery::v0::UnifiedBatteryFeatureV0,
         wireless_device_status::v0::WirelessDeviceStatusFeatureV0,
     },
 };
@@ -173,7 +174,10 @@ lazy_static! {
         }),
         (0x1004, KnownFeature {
             name: "UnifiedBattery",
-            versions: &[]
+            versions: &[FeatureVersion {
+                starting_version: UnifiedBatteryFeatureV0::STARTING_VERSION,
+                producer: new_dyn::<UnifiedBatteryFeatureV0>
+            }]
         }),
         (0x1010, KnownFeature {
             name: "ChargingControl",
