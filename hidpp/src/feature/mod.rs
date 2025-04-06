@@ -13,6 +13,7 @@ pub mod device_type_and_name;
 pub mod feature_set;
 pub mod registry;
 pub mod root;
+pub mod smartshift;
 pub mod thumbwheel;
 pub mod unified_battery;
 pub mod wireless_device_status;

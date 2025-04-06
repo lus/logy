@@ -119,10 +119,10 @@ impl From<[u8; 2]> for BatteryCapabilities {
         if value[0] & (1 << 1) != 0 {
             reported_levels.insert(BatteryLevel::Low);
         }
-        if value[0] & (1 << 1) != 0 {
+        if value[0] & (1 << 2) != 0 {
             reported_levels.insert(BatteryLevel::Good);
         }
-        if value[0] & (1 << 1) != 0 {
+        if value[0] & (1 << 3) != 0 {
             reported_levels.insert(BatteryLevel::Full);
         }
 
@@ -159,10 +159,10 @@ pub struct BatteryInfo {
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BatteryLevel {
-    Critical = 1,
-    Low = 2,
-    Good = 4,
-    Full = 8,
+    Critical = 1 << 0,
+    Low = 1 << 1,
+    Good = 1 << 2,
+    Full = 1 << 3,
 }
 
 /// Represents the charging status of the battery.

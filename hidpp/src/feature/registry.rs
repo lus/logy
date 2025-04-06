@@ -15,6 +15,7 @@ use crate::{
         device_type_and_name::v0::DeviceTypeAndNameFeatureV0,
         feature_set::v0::FeatureSetFeatureV0,
         root::RootFeature,
+        smartshift::v0::SmartShiftFeatureV0,
         thumbwheel::v0::ThumbwheelFeatureV0,
         unified_battery::v0::UnifiedBatteryFeatureV0,
         wireless_device_status::v0::WirelessDeviceStatusFeatureV0,
@@ -296,7 +297,10 @@ lazy_static! {
         }),
         (0x2110, KnownFeature {
             name: "SmartShiftWheel",
-            versions: &[]
+            versions: &[FeatureVersion {
+                starting_version: SmartShiftFeatureV0::STARTING_VERSION,
+                producer: new_dyn::<SmartShiftFeatureV0>
+            }]
         }),
         (0x2111, KnownFeature {
             name: "SmartShiftWheelEnhanced",
