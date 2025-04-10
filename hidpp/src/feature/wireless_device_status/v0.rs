@@ -131,7 +131,7 @@ pub struct WirelessDeviceStatusBroadcast {
 }
 
 /// Represents a device status as reported in
-/// [`WirelessDeviceStatusBroadcastEvent::status`].
+/// [`WirelessDeviceStatusBroadcast::status`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
 #[non_exhaustive]
 #[repr(u8)]
@@ -141,7 +141,7 @@ pub enum WirelessDeviceStatus {
 }
 
 /// Represents a request as reported in
-/// [`WirelessDeviceStatusBroadcastEvent::request`].
+/// [`WirelessDeviceStatusBroadcast::request`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
 #[non_exhaustive]
 #[repr(u8)]
@@ -151,7 +151,7 @@ pub enum WirelessDeviceStatusRequest {
 }
 
 /// Represents a broadcast reason as reported in
-/// [`WirelessDeviceStatusBroadcastEvent::reason`].
+/// [`WirelessDeviceStatusBroadcast::reason`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
 #[non_exhaustive]
 #[repr(u8)]

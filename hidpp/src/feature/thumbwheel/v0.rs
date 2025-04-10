@@ -163,8 +163,8 @@ impl ThumbwheelFeatureV0 {
     ///
     /// This can be used to divert the thumbwheel notifications to HID++.
     ///
-    /// If `invert_direction` is set, the [`ThumbwheelEvent::rotation`] field
-    /// will be the inverse of that would be expected if following
+    /// If `invert_direction` is set, the [`ThumbwheelStatusUpdate::rotation`]
+    /// field will be the inverse of that would be expected if following
     /// [`ThumbwheelInfo::default_direction`].
     pub async fn set_thumbwheel_reporting(
         &self,
@@ -209,14 +209,14 @@ pub struct ThumbwheelInfo {
     pub diverted_resolution: u16,
 
     /// If [`ThumbwheelCapabilities::time_stamp`] is set, this is set to the
-    /// timestamp unit used for [`ThumbwheelEvent::time_elapsed`] in
+    /// timestamp unit used for [`ThumbwheelStatusUpdate::time_elapsed`] in
     /// microseconds. If the capability is not supported, this will always be
     /// `0`.
     pub time_unit: u16,
 
     /// The default rotation direction. This determines which rotation direction
     /// corresponds to which number range (positive or negative) for the
-    /// [`ThumbwheelEvent::rotation`] value.
+    /// [`ThumbwheelStatusUpdate::rotation`] value.
     pub default_direction: ThumbwheelDirection,
 
     /// The capabilites of the thumbwheel.
@@ -224,7 +224,7 @@ pub struct ThumbwheelInfo {
 }
 
 /// Determines which thumbwheel rotation corresponds to which number range
-/// (positive or negative) for the [`ThumbwheelEvent::rotation`] value.
+/// (positive or negative) for the [`ThumbwheelStatusUpdate::rotation`] value.
 ///
 /// The direction descriptors (`LeftOrBack`, `RightOrFront`) are
 /// specific to the device orientation.
@@ -241,25 +241,25 @@ pub enum ThumbwheelDirection {
 #[non_exhaustive]
 pub struct ThumbwheelCapabilities {
     /// Whether the thumbwheel supports emitting the elapsed time between two
-    /// events via [`ThumbwheelEvent::time_elapsed`].
+    /// events via [`ThumbwheelStatusUpdate::time_elapsed`].
     pub time_stamp: bool,
 
     /// Whether the thumbwheel is equipped with a touch sensor.
     ///
-    /// If this capability is supported, [`ThumbwheelEvent::touch`] will be set
-    /// to whether the user touches the thumbwheel.
+    /// If this capability is supported, [`ThumbwheelStatusUpdate::touch`] will
+    /// be set to whether the user touches the thumbwheel.
     pub touch: bool,
 
     /// Whether the thumbwheel is equipped with a proximity sensor.
     ///
-    /// If this capability is supported, [`ThumbwheelEvent::proxy`] will be set
-    /// to whether the user is close to the thumbwheel.
+    /// If this capability is supported, [`ThumbwheelStatusUpdate::proxy`] will
+    /// be set to whether the user is close to the thumbwheel.
     pub proxy: bool,
 
     /// Whether the thumbwheel supports detecting single taps.
     ///
-    /// If this capability is supported, [`ThumbwheelEvent::single_tap`] will be
-    /// set to whether the user tapped the thumbwheel.
+    /// If this capability is supported, [`ThumbwheelStatusUpdate::single_tap`]
+    /// will be set to whether the user tapped the thumbwheel.
     pub single_tap: bool,
 }
 
@@ -364,7 +364,7 @@ pub struct ThumbwheelStatusUpdate {
 }
 
 /// Represents a thumbwheel rotation status as reported in
-/// [`ThumbwheelEvent::rotation_status`].
+/// [`ThumbwheelStatusUpdate::rotation_status`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
 #[non_exhaustive]
 #[repr(u8)]
