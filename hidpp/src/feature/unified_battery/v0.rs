@@ -1,13 +1,17 @@
 //! Implements the feature starting with version 0.
 
-use std::{collections::HashSet, hash::Hash, sync::Arc};
+use std::{
+    collections::HashSet,
+    hash::Hash,
+    sync::{Arc, Mutex, mpsc},
+};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     channel::HidppChannel,
-    feature::{CreatableFeature, Feature},
-    nibble::U4,
+    feature::{CreatableFeature, EmittingFeature, Feature},
+    nibble::{self, U4},
     protocol::v20::{self, Hidpp20Error},
 };
 
@@ -23,6 +27,14 @@ pub struct UnifiedBatteryFeatureV0 {
 
     /// The index of the feature in the feature table.
     feature_index: u8,
+
+    /// A collection of event listeners added via [`Self::listen`].
+    listeners: Arc<Mutex<Vec<mpsc::Sender<BatteryInfo>>>>,
+
+    /// The handle assigned to the message listener registered via
+    /// [`HidppChannel::add_msg_listener`].
+    /// This is used to remove the listener when the feature is dropped.
+    msg_listener_hdl: u32,
 }
 
 impl CreatableFeature for UnifiedBatteryFeatureV0 {
@@ -30,15 +42,71 @@ impl CreatableFeature for UnifiedBatteryFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
+        let listeners_rc = Arc::new(Mutex::new(Vec::<mpsc::Sender<BatteryInfo>>::new()));
+
+        let hdl = chan.add_msg_listener({
+            let listeners = Arc::clone(&listeners_rc);
+
+            move |raw, matched| {
+                if matched {
+                    return;
+                }
+
+                let msg = v20::Message::from(raw);
+
+                let header = msg.header();
+                if header.device_index != device_index
+                    || header.feature_index != feature_index
+                    || nibble::combine(header.software_id, header.function_id) != 0
+                {
+                    return;
+                }
+
+                let payload = msg.extend_payload();
+                let Ok(level) = BatteryLevel::try_from(payload[1]) else {
+                    return;
+                };
+                let Ok(status) = BatteryStatus::try_from(payload[2]) else {
+                    return;
+                };
+
+                listeners.lock().unwrap().retain(|listener| {
+                    listener
+                        .send(BatteryInfo {
+                            charging_percentage: payload[0],
+                            level,
+                            status,
+                        })
+                        .is_ok()
+                });
+            }
+        });
+
         Self {
             chan,
             device_index,
             feature_index,
+            listeners: listeners_rc,
+            msg_listener_hdl: hdl,
         }
     }
 }
 
 impl Feature for UnifiedBatteryFeatureV0 {
+}
+
+impl EmittingFeature<BatteryInfo> for UnifiedBatteryFeatureV0 {
+    fn listen(&self) -> mpsc::Receiver<BatteryInfo> {
+        let (tx, rx) = mpsc::channel::<BatteryInfo>();
+        self.listeners.lock().unwrap().push(tx);
+        rx
+    }
+}
+
+impl Drop for UnifiedBatteryFeatureV0 {
+    fn drop(&mut self) {
+        self.chan.remove_msg_listener(self.msg_listener_hdl);
+    }
 }
 
 impl UnifiedBatteryFeatureV0 {
