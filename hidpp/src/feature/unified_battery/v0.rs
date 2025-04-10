@@ -29,7 +29,7 @@ pub struct UnifiedBatteryFeatureV0 {
     feature_index: u8,
 
     /// A collection of event listeners added via [`Self::listen`].
-    listeners: Arc<Mutex<Vec<mpsc::Sender<BatteryInfo>>>>,
+    listeners: Arc<Mutex<Vec<mpsc::Sender<BatteryEvent>>>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -42,7 +42,7 @@ impl CreatableFeature for UnifiedBatteryFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let listeners_rc = Arc::new(Mutex::new(Vec::<mpsc::Sender<BatteryInfo>>::new()));
+        let listeners_rc = Arc::new(Mutex::new(Vec::<mpsc::Sender<BatteryEvent>>::new()));
 
         let hdl = chan.add_msg_listener({
             let listeners = Arc::clone(&listeners_rc);
@@ -72,11 +72,11 @@ impl CreatableFeature for UnifiedBatteryFeatureV0 {
 
                 listeners.lock().unwrap().retain(|listener| {
                     listener
-                        .send(BatteryInfo {
+                        .send(BatteryEvent::InfoUpdate(BatteryInfo {
                             charging_percentage: payload[0],
                             level,
                             status,
-                        })
+                        }))
                         .is_ok()
                 });
             }
@@ -95,9 +95,9 @@ impl CreatableFeature for UnifiedBatteryFeatureV0 {
 impl Feature for UnifiedBatteryFeatureV0 {
 }
 
-impl EmittingFeature<BatteryInfo> for UnifiedBatteryFeatureV0 {
-    fn listen(&self) -> mpsc::Receiver<BatteryInfo> {
-        let (tx, rx) = mpsc::channel::<BatteryInfo>();
+impl EmittingFeature<BatteryEvent> for UnifiedBatteryFeatureV0 {
+    fn listen(&self) -> mpsc::Receiver<BatteryEvent> {
+        let (tx, rx) = mpsc::channel::<BatteryEvent>();
         self.listeners.lock().unwrap().push(tx);
         rx
     }
@@ -243,4 +243,14 @@ pub enum BatteryStatus {
     ChargingSlow = 2,
     Full = 3,
     Error = 4,
+}
+
+/// Represents an event emitted by the [`UnifiedBatteryFeatureV0`] feature.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum BatteryEvent {
+    /// Is emitted whenever the battery information changes.
+    ///
+    /// This event is always enabled.
+    InfoUpdate(BatteryInfo),
 }

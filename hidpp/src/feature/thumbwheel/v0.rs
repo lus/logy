@@ -65,14 +65,14 @@ impl CreatableFeature for ThumbwheelFeatureV0 {
 
                 listeners.lock().unwrap().retain(|listener| {
                     listener
-                        .send(ThumbwheelEvent {
+                        .send(ThumbwheelEvent::StatusUpdate(ThumbwheelStatusUpdate {
                             rotation: i16::from_be_bytes(payload[0..=1].try_into().unwrap()),
                             time_elapsed: u16::from_be_bytes(payload[2..=3].try_into().unwrap()),
                             rotation_status,
                             touch: payload[5] & (1 << 1) != 0,
                             proxy: payload[5] & (1 << 2) != 0,
                             single_tap: payload[5] & (1 << 3) != 0,
-                        })
+                        }))
                         .is_ok()
                 });
             }
@@ -315,12 +315,20 @@ pub enum ThumbwheelReportingMode {
     Diverted = 1,
 }
 
-/// Represents an event raised whenever the thumbwheel status updates.
-///
-/// Requires the thumbwheel to be in diverted reporting mode.
+/// Represents an event emitted by the [`ThumbwheelFeatureV0`] feature.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct ThumbwheelEvent {
+pub enum ThumbwheelEvent {
+    /// Is emitted whenever the thumbwheel status updates.
+    ///
+    /// Requires the thumbwheel to be in diverted reporting mode.
+    StatusUpdate(ThumbwheelStatusUpdate),
+}
+
+/// Represents the data of the [`ThumbwheelEvent::StatusUpdate`] event.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct ThumbwheelStatusUpdate {
     /// The rotation in relation to [`ThumbwheelInfo::native_resolution`] or
     /// [`ThumbwheelInfo::diverted_resolution`].
     pub rotation: i16,

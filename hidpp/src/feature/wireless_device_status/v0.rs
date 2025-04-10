@@ -19,7 +19,7 @@ pub struct WirelessDeviceStatusFeatureV0 {
     chan: Arc<HidppChannel>,
 
     /// A collection of event listeners added via [`Self::listen`].
-    listeners: Arc<Mutex<Vec<mpsc::Sender<WirelessDeviceStatusBroadcastEvent>>>>,
+    listeners: Arc<Mutex<Vec<mpsc::Sender<WirelessDeviceStatusEvent>>>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -32,9 +32,9 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let listeners_rc = Arc::new(Mutex::new(Vec::<
-            mpsc::Sender<WirelessDeviceStatusBroadcastEvent>,
-        >::new()));
+        let listeners_rc = Arc::new(Mutex::new(
+            Vec::<mpsc::Sender<WirelessDeviceStatusEvent>>::new(),
+        ));
 
         let hdl = chan.add_msg_listener({
             let listeners = Arc::clone(&listeners_rc);
@@ -67,11 +67,13 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
 
                 listeners.lock().unwrap().retain(|listener| {
                     listener
-                        .send(WirelessDeviceStatusBroadcastEvent {
-                            status,
-                            request,
-                            reason,
-                        })
+                        .send(WirelessDeviceStatusEvent::StatusBroadcast(
+                            WirelessDeviceStatusBroadcast {
+                                status,
+                                request,
+                                reason,
+                            },
+                        ))
                         .is_ok()
                 });
             }
@@ -88,9 +90,9 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
 impl Feature for WirelessDeviceStatusFeatureV0 {
 }
 
-impl EmittingFeature<WirelessDeviceStatusBroadcastEvent> for WirelessDeviceStatusFeatureV0 {
-    fn listen(&self) -> mpsc::Receiver<WirelessDeviceStatusBroadcastEvent> {
-        let (tx, rx) = mpsc::channel::<WirelessDeviceStatusBroadcastEvent>();
+impl EmittingFeature<WirelessDeviceStatusEvent> for WirelessDeviceStatusFeatureV0 {
+    fn listen(&self) -> mpsc::Receiver<WirelessDeviceStatusEvent> {
+        let (tx, rx) = mpsc::channel::<WirelessDeviceStatusEvent>();
         self.listeners.lock().unwrap().push(tx);
         rx
     }
@@ -102,13 +104,22 @@ impl Drop for WirelessDeviceStatusFeatureV0 {
     }
 }
 
-/// Represents the event that a device sends whenever it (re)connects to the
-/// host.
-///
-/// This event is always enabled.
+/// Represents an event emitted by the [`WirelessDeviceStatusFeatureV0`]
+/// feature.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct WirelessDeviceStatusBroadcastEvent {
+pub enum WirelessDeviceStatusEvent {
+    /// Is emitted whenever a device (re)connects to the host.
+    ///
+    /// This event is always enabled.
+    StatusBroadcast(WirelessDeviceStatusBroadcast),
+}
+
+/// Represents the data of the [`WirelessDeviceStatusEvent::StatusBroadcast`]
+/// event.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct WirelessDeviceStatusBroadcast {
     /// The status the device reports to be in.
     pub status: WirelessDeviceStatus,
 
