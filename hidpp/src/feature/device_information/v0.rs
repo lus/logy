@@ -218,7 +218,7 @@ impl From<u8> for DeviceTransport {
             usb: value & (1 << 3) != 0,
             e_quad: value & (1 << 2) != 0,
             btle: value & (1 << 1) != 0,
-            bluetooth: value & (1 << 0) != 0,
+            bluetooth: value & 1 != 0,
         }
     }
 }
@@ -238,7 +238,7 @@ pub struct DeviceInformationCapabilities {
 impl From<u8> for DeviceInformationCapabilities {
     fn from(value: u8) -> Self {
         Self {
-            serial_number: value & (1 << 0) != 0,
+            serial_number: value & 1 != 0,
         }
     }
 }

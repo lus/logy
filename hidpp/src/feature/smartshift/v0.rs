@@ -110,7 +110,7 @@ impl SmartShiftFeatureV0 {
 }
 
 /// Represents the ratchet control mode of the mouse wheel.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct RatchetControlMode {
     /// The mode the wheel is currently set to.

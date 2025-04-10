@@ -153,7 +153,7 @@ impl ThumbwheelFeatureV0 {
         Ok(ThumbwheelStatus {
             reporting_mode: ThumbwheelReportingMode::try_from(payload[0])
                 .map_err(|_| Hidpp20Error::UnsupportedResponse)?,
-            direction_inverted: payload[1] & (1 << 0) != 0,
+            direction_inverted: payload[1] & 1 != 0,
             touch: payload[1] & (1 << 1) != 0,
             proxy: payload[1] & (1 << 2) != 0,
         })
@@ -266,7 +266,7 @@ pub struct ThumbwheelCapabilities {
 impl From<u8> for ThumbwheelCapabilities {
     fn from(value: u8) -> Self {
         Self {
-            time_stamp: value & (1 << 0) != 0,
+            time_stamp: value & 1 != 0,
             touch: value & (1 << 1) != 0,
             proxy: value & (1 << 2) != 0,
             single_tap: value & (1 << 3) != 0,

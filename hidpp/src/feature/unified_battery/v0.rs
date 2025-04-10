@@ -181,7 +181,7 @@ pub struct BatteryCapabilities {
 impl From<[u8; 2]> for BatteryCapabilities {
     fn from(value: [u8; 2]) -> Self {
         let mut reported_levels = HashSet::new();
-        if value[0] & (1 << 0) != 0 {
+        if value[0] & 1 != 0 {
             reported_levels.insert(BatteryLevel::Critical);
         }
         if value[0] & (1 << 1) != 0 {
@@ -196,7 +196,7 @@ impl From<[u8; 2]> for BatteryCapabilities {
 
         Self {
             reported_levels,
-            rechargeable: value[1] & (1 << 0) != 0,
+            rechargeable: value[1] & 1 != 0,
             percentage: value[1] & (1 << 1) != 0,
         }
     }
@@ -227,7 +227,7 @@ pub struct BatteryInfo {
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BatteryLevel {
-    Critical = 1 << 0,
+    Critical = 1,
     Low = 1 << 1,
     Good = 1 << 2,
     Full = 1 << 3,

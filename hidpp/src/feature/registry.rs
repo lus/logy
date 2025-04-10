@@ -14,6 +14,7 @@ use crate::{
         device_information::v0::DeviceInformationFeatureV0,
         device_type_and_name::v0::DeviceTypeAndNameFeatureV0,
         feature_set::v0::FeatureSetFeatureV0,
+        hires_wheel::v0::HiResWheelFeatureV0,
         root::RootFeature,
         smartshift::v0::SmartShiftFeatureV0,
         thumbwheel::v0::ThumbwheelFeatureV0,
@@ -312,7 +313,10 @@ lazy_static! {
         }),
         (0x2121, KnownFeature {
             name: "HiResWheel",
-            versions: &[]
+            versions: &[FeatureVersion {
+                starting_version: HiResWheelFeatureV0::STARTING_VERSION,
+                producer: new_dyn::<HiResWheelFeatureV0>
+            }]
         }),
         (0x2130, KnownFeature {
             name: "RatchetWheel",
