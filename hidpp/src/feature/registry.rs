@@ -30,7 +30,7 @@ pub type FeatureImplProducer =
 
 /// Represents a known feature implementation starting from a specific feature
 /// version.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeatureVersion {
     /// The minimum feature version the implementation supports.
     pub starting_version: u8,
@@ -40,11 +40,11 @@ pub struct FeatureVersion {
 }
 
 /// Represents a known HID++2.0 device feature.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct KnownFeature {
     /// The name of the feature.
     /// This is usually a slightly modified version of the name found in
-    /// Logitech documentation.
+    /// Logitech's documentation.
     pub name: &'static str,
 
     /// A list of concrete implementations of the feature, each supporting the
@@ -162,12 +162,16 @@ lazy_static! {
             name: "DfuControlSigned",
             versions: &[]
         }),
+        (0x00c3, KnownFeature {
+            name: "DfuControl",
+            versions: &[]
+        }),
         (0x00d0, KnownFeature {
             name: "Dfu",
             versions: &[]
         }),
         (0x1000, KnownFeature {
-            name: "BatteryUnifiedLevelStatus",
+            name: "BatteryStatus",
             versions: &[]
         }),
         (0x1001, KnownFeature {
@@ -225,6 +229,10 @@ lazy_static! {
             name: "Backlight3",
             versions: &[]
         }),
+        (0x1990, KnownFeature {
+            name: "Illumination",
+            versions: &[]
+        }),
         (0x1a00, KnownFeature {
             name: "PresenterControl",
             versions: &[]
@@ -234,7 +242,7 @@ lazy_static! {
             versions: &[]
         }),
         (0x1b00, KnownFeature {
-            name: "ReprogControls1",
+            name: "ReprogControls",
             versions: &[]
         }),
         (0x1b01, KnownFeature {
@@ -337,6 +345,10 @@ lazy_static! {
             name: "AdjustableDpi",
             versions: &[]
         }),
+        (0x2202, KnownFeature {
+            name: "ExtendedAdjustableDpi",
+            versions: &[]
+        }),
         (0x2205, KnownFeature {
             name: "PointerMotionScaling",
             versions: &[]
@@ -347,6 +359,14 @@ lazy_static! {
         }),
         (0x2240, KnownFeature {
             name: "SurfaceTuning",
+            versions: &[]
+        }),
+        (0x2250, KnownFeature {
+            name: "XyStats",
+            versions: &[]
+        }),
+        (0x2251, KnownFeature {
+            name: "WheelStats",
             versions: &[]
         }),
         (0x2400, KnownFeature {
@@ -471,6 +491,10 @@ lazy_static! {
         }),
         (0x8060, KnownFeature {
             name: "AdjustableReportRate",
+            versions: &[]
+        }),
+        (0x8061, KnownFeature {
+            name: "ExtendedAdjustableReportRate",
             versions: &[]
         }),
         (0x8070, KnownFeature {
