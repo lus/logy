@@ -182,7 +182,7 @@ pub enum Hidpp20Error {
     #[error("a HID++2.0 feature returned an error")]
     Feature(ErrorType),
 
-    /// Indicates that a response received is not fully supported.
-    #[error("the response received from the device is (partly) unsupported")]
+    /// Indicates that a received response is not fully supported.
+    #[error("the received response from the device is (partly) unsupported")]
     UnsupportedResponse,
 }

@@ -24,3 +24,4 @@ pub mod device;
 pub mod feature;
 pub mod nibble;
 pub mod protocol;
+pub mod receiver;

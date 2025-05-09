@@ -63,6 +63,12 @@ pub const LONG_REPORT_LENGTH: usize = 20;
 /// trait.
 #[async_trait]
 pub trait RawHidChannel: Sync + Send + 'static {
+    /// Provides the vendor ID of the connected HID device.
+    fn vendor_id(&self) -> u16;
+
+    /// Provides the product ID of the connected HID device.
+    fn product_id(&self) -> u16;
+
     /// Writes a raw report to the channel.
     ///
     /// Returns the exact amount of written bytes on success.
@@ -212,8 +218,14 @@ pub struct HidppChannel {
     /// Whether the channel supports long (20 bytes) HID++ messages.
     pub supports_long: bool,
 
+    /// The vendor ID of the connected HID device.
+    pub vendor_id: u16,
+
+    // The product ID of the connected HID device.
+    pub product_id: u16,
+
     /// The underlying raw HID channel.
-    raw_channel: Arc<dyn RawHidChannel>,
+    pub raw_channel: Arc<dyn RawHidChannel>,
 
     /// Whether to rotate the [`Self::software_id`].
     rotate_software_id: AtomicBool,
@@ -327,6 +339,8 @@ impl HidppChannel {
         Ok(Self {
             supports_short,
             supports_long,
+            vendor_id: raw_channel_rc.vendor_id(),
+            product_id: raw_channel_rc.product_id(),
             raw_channel: raw_channel_rc,
             rotate_software_id: AtomicBool::new(false),
             software_id: AtomicU8::new(0x01),

@@ -102,7 +102,9 @@ impl DeviceFriendlyNameFeatureV0 {
         let mut len = 0;
         while len < count as usize {
             let part = self.get_friendly_name(len as u8).await?;
-            string.push_str(str::from_utf8(&part).map_err(|_| Hidpp20Error::UnsupportedResponse)?);
+            string.push_str(
+                core::str::from_utf8(&part).map_err(|_| Hidpp20Error::UnsupportedResponse)?,
+            );
             len = string.len();
         }
 
@@ -146,7 +148,9 @@ impl DeviceFriendlyNameFeatureV0 {
         let mut len = 0;
         while len < count as usize {
             let part = self.get_default_friendly_name(len as u8).await?;
-            string.push_str(str::from_utf8(&part).map_err(|_| Hidpp20Error::UnsupportedResponse)?);
+            string.push_str(
+                core::str::from_utf8(&part).map_err(|_| Hidpp20Error::UnsupportedResponse)?,
+            );
             len = string.len();
         }
 

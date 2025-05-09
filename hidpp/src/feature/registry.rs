@@ -163,11 +163,15 @@ lazy_static! {
             versions: &[]
         }),
         (0x00c3, KnownFeature {
-            name: "DfuControl",
+            name: "DfuControlBolt",
             versions: &[]
         }),
         (0x00d0, KnownFeature {
             name: "Dfu",
+            versions: &[]
+        }),
+        (0x00d1, KnownFeature {
+            name: "DfuResumable",
             versions: &[]
         }),
         (0x1000, KnownFeature {
