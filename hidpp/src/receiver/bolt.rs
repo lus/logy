@@ -5,7 +5,11 @@ use std::sync::Arc;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use super::{RECEIVER_DEVICE_INDEX, ReceiverError};
-use crate::{channel::HidppChannel, nibble::U4, protocol::v10::Hidpp10Error};
+use crate::{
+    channel::HidppChannel,
+    nibble::U4,
+    protocol::v10::{self, Hidpp10Error},
+};
 
 /// Contains all known USB vendor and product ID pairs representing Bolt
 /// receivers.
@@ -52,7 +56,16 @@ pub enum BoltInfoSubRegister {
 /// Implements the Bolt wireless receiver.
 #[derive(Clone)]
 pub struct BoltReceiver {
-    channel: Arc<HidppChannel>,
+    /// The underlying HID++ channel.
+    chan: Arc<HidppChannel>,
+
+    /// The TX/RX pair for emitting [`BoltEvent`]s.
+    events: (flume::Sender<BoltEvent>, flume::Receiver<BoltEvent>),
+
+    /// The handle assigned to the message listener registered via
+    /// [`HidppChannel::add_msg_listener`].
+    /// This is used to remove the listener when the receiver is dropped.
+    msg_listener_hdl: u32,
 }
 
 impl BoltReceiver {
@@ -61,14 +74,54 @@ impl BoltReceiver {
     /// If no receiver could be found, or if the vendor and product IDs don't
     /// match the ones of any known Bolt receiver, this function will return
     /// [`ReceiverError::UnknownReceiver`].
-    pub fn new(channel: Arc<HidppChannel>) -> Result<Self, ReceiverError> {
-        if !BOLT_VPID_PAIRS.contains(&(channel.vendor_id, channel.product_id)) {
+    pub fn new(chan: Arc<HidppChannel>) -> Result<Self, ReceiverError> {
+        if !BOLT_VPID_PAIRS.contains(&(chan.vendor_id, chan.product_id)) {
             return Err(ReceiverError::UnknownReceiver);
         }
 
+        let (tx, rx) = flume::unbounded();
+
+        let hdl = chan.add_msg_listener({
+            let tx = tx.clone();
+
+            move |raw, matched| {
+                if matched {
+                    return;
+                }
+
+                let v10::Message::Short(header, payload) = v10::Message::from(raw) else {
+                    return;
+                };
+
+                match header.sub_id {
+                    // Device arrival
+                    0x41 => {
+                        let Ok(kind) = BoltDeviceKind::try_from(payload[1] & 0x0f) else {
+                            return;
+                        };
+
+                        let _ = tx.send(BoltEvent::DeviceConnection(BoltDeviceConnection {
+                            index: header.device_index,
+                            kind,
+                            encrypted: payload[1] & (1 << 5) != 0,
+                            online: payload[1] & (1 << 6) == 0,
+                            wpid: u16::from_le_bytes(payload[2..=3].try_into().unwrap()),
+                        }));
+                    },
+                    _ => (),
+                }
+            }
+        });
+
         Ok(BoltReceiver {
-            channel,
+            chan,
+            events: (tx, rx),
+            msg_listener_hdl: hdl,
         })
+    }
+
+    pub fn listen(&self) -> flume::Receiver<BoltEvent> {
+        self.events.1.clone()
     }
 
     /// Counts the amount of devices currently paired to this receiver. The
@@ -76,7 +129,7 @@ impl BoltReceiver {
     /// persistent.
     pub async fn count_pairings(&self) -> Result<u8, ReceiverError> {
         let response = self
-            .channel
+            .chan
             .read_register(
                 RECEIVER_DEVICE_INDEX,
                 BoltRegister::Connections.into(),
@@ -90,7 +143,7 @@ impl BoltReceiver {
     /// Triggers device arrival notifications for all devices currently
     /// connected to the receiver. This is useful for device enumeration.
     pub async fn trigger_device_arrival(&self) -> Result<(), ReceiverError> {
-        self.channel
+        self.chan
             .write_register(RECEIVER_DEVICE_INDEX, BoltRegister::Connections.into(), [
                 0x02, 0x00, 0x00,
             ])
@@ -102,7 +155,7 @@ impl BoltReceiver {
     /// Provides the unique ID of the receiver.
     pub async fn get_unique_id(&self) -> Result<String, ReceiverError> {
         let response = self
-            .channel
+            .chan
             .read_long_register(
                 RECEIVER_DEVICE_INDEX,
                 BoltRegister::UniqueId.into(),
@@ -130,7 +183,7 @@ impl BoltReceiver {
         device_index: U4,
     ) -> Result<BoltDevicePairingInformation, ReceiverError> {
         let response = self
-            .channel
+            .chan
             .read_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::ReceiverInfo.into(), [
                 u8::from(BoltInfoSubRegister::DevicePairingInformation) + device_index.to_lo(),
                 0x00,
@@ -138,19 +191,12 @@ impl BoltReceiver {
             ])
             .await?;
 
-        // response[1] contains the device kind (0x02 in my case), but it seems to
-        // contain different values if the device is offline.
-        // If my mouse is offline, it contains 0x42. I suspect that the device kind is
-        // set only in the 4 rightmost bits and the 4 leftmost ones represent some kind
-        // of device status, but I'd need more data for different device kinds to
-        // verify this.
-
-        // I unfortunately couldn't find out what the remaining response bytes are for.
-
         Ok(BoltDevicePairingInformation {
             wpid: u16::from_le_bytes(response[2..=3].try_into().unwrap()),
             kind: BoltDeviceKind::try_from(response[1] & 0x0f)
                 .map_err(|_| Hidpp10Error::UnsupportedResponse)?,
+            encrypted: response[1] & (1 << 5) != 0,
+            online: response[1] & (1 << 6) == 0,
             unit_id: response[4..=7].try_into().unwrap(),
         })
     }
@@ -162,7 +208,7 @@ impl BoltReceiver {
         // such a name to be able to test this.
 
         let response = self
-            .channel
+            .chan
             .read_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::ReceiverInfo.into(), [
                 u8::from(BoltInfoSubRegister::DeviceCodename) + device_index.to_lo(),
                 0x01,
@@ -177,6 +223,12 @@ impl BoltReceiver {
     }
 }
 
+impl Drop for BoltReceiver {
+    fn drop(&mut self) {
+        self.chan.remove_msg_listener(self.msg_listener_hdl);
+    }
+}
+
 /// Represents some information about a specific device pairing as returned by
 /// [`BoltReceiver::get_device_pairing_information`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -186,7 +238,13 @@ pub struct BoltDevicePairingInformation {
     wpid: u16,
 
     /// The kind of the device.
-    kind: BoltDeviceKind,
+    pub kind: BoltDeviceKind,
+
+    /// Whether the link to the device is encrypted.
+    pub encrypted: bool,
+
+    /// Whether the device is online/reachable.
+    pub online: bool,
 
     /// The unit ID of the device.
     unit_id: [u8; 4],
@@ -209,4 +267,37 @@ pub enum BoltDeviceKind {
     Gamepad = 0x0b,
     Joystick = 0x0c,
     Headset = 0x0d,
+}
+
+/// Represents an event emitted by a Bolt receiver.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub enum BoltEvent {
+    /// Is emitted whenever a device connects to or disconnects from the
+    /// receiver.
+    ///
+    /// Can be triggered for all paired devices using
+    /// [`BoltReceiver::trigger_device_arrival`] to allow easy device
+    /// enumeration.
+    DeviceConnection(BoltDeviceConnection),
+}
+
+/// Represents the data of the [`BoltEvent::DeviceConnection`] event.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub struct BoltDeviceConnection {
+    /// The index of the device used to communicate with it.
+    pub index: u8,
+
+    /// The kind of the device.
+    pub kind: BoltDeviceKind,
+
+    /// Whether the link to the device is encrypted.
+    pub encrypted: bool,
+
+    /// Whether the device is online/reachable.
+    pub online: bool,
+
+    /// The wireless product ID of the device.
+    pub wpid: u16,
 }
