@@ -225,7 +225,7 @@ pub struct HidppChannel {
     pub product_id: u16,
 
     /// The underlying raw HID channel.
-    pub raw_channel: Arc<dyn RawHidChannel>,
+    raw_channel: Arc<dyn RawHidChannel>,
 
     /// Whether to rotate the [`Self::software_id`].
     rotate_software_id: AtomicBool,
