@@ -1,4 +1,14 @@
 //! Implements the Logi Bolt receiver.
+//!
+//! Bolt can be seen as a successor to the Unifying receiver. Both of them
+//! support up to 6 paired devices, but Bolt uses BTLE technology and introduces
+//! so-called passkeys for authenticating devices before pairing them.
+//!
+//! There is little to no public documentation about what registers Bolt support
+//! (and they seem to differ quite substantially from registers supported by
+//! Unifying and other receivers), so this implementation is based largely on
+//! information gathered by looking at other codebases (primarily Solaar) and
+//! searching registers by fuzzing them.
 
 use std::sync::Arc;
 
@@ -94,7 +104,7 @@ impl BoltReceiver {
                 };
 
                 match header.sub_id {
-                    // Device arrival
+                    // Device connection
                     0x41 => {
                         let Ok(kind) = BoltDeviceKind::try_from(payload[1] & 0x0f) else {
                             return;
@@ -120,6 +130,7 @@ impl BoltReceiver {
         })
     }
 
+    /// Creates a new listener for receiving Bolt receiver events.
     pub fn listen(&self) -> flume::Receiver<BoltEvent> {
         self.events.1.clone()
     }

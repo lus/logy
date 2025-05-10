@@ -1,4 +1,16 @@
-//! Implements the different HID++ wireless receivers, including pairing.
+//! Implements the different HID++ wireless receivers.
+//!
+//! Because of the lack of public documentation about the different receivers
+//! and their capabilities, and because I currently only own a single Bolt
+//! receiver, this module is largely incomplete. I would be more than happy for
+//! anyone who owns a different receiver, with Unifying having the highest
+//! priority, and who is willing to actively support its implementation by
+//! providing information and testing.
+//!
+//! Receivers can generally only be differentiated by their USB vendor and
+//! product IDs, so the [`detect`] function does nothing more than matching
+//! those values to the sets of known vendor and product ID pairs of the
+//! different receivers.
 
 use std::sync::Arc;
 

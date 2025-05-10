@@ -138,8 +138,8 @@ impl UnifiedBatteryFeatureV0 {
         let payload = response.extend_payload();
 
         // payload[3] contains some kind of information about the status of the external
-        // power source, according to
-        // https://github.com/torvalds/linux/blob/a8662bcd2ff152bfbc751cab20f33053d74d0963/drivers/hid/hid-logitech-hidpp.c#L1608
+        // power source (maybe 0 = disconnected and 1 = connected, I don't have enough
+        // info about that), according to https://github.com/torvalds/linux/blob/a8662bcd2ff152bfbc751cab20f33053d74d0963/drivers/hid/hid-logitech-hidpp.c#L1608
         // and
         // https://github.com/torvalds/linux/blob/a8662bcd2ff152bfbc751cab20f33053d74d0963/drivers/hid/hid-logitech-hidpp.c#L1679
 
