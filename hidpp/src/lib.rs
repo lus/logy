@@ -46,8 +46,19 @@
 //! ```
 //! use std::sync::Arc;
 //!
-//! use hidpp::{channel::HidppChannel, receiver};
-//!
+//! use hidpp::{
+//!     channel::HidppChannel,
+//!     device::Device,
+//!     feature::{
+//!        CreatableFeature,
+//!        EmittingFeature,
+//!        feature_set::v0::FeatureSetFeatureV0,
+//!        thumbwheel::v0::{ThumbwheelEvent, ThumbwheelFeatureV0, ThumbwheelReportingMode},
+//!    },
+//!    nibble::U4,
+//!    receiver::{self, Receiver, bolt::BoltEvent},
+//! };
+
 //! // First, we will create the HID++ channel.
 //! // This function will return `ChannelError::HidppNotSupported`
 //! // if the passed HID channel does not support HID++.
@@ -70,10 +81,11 @@
 //!
 //! // If a wireless receiver is handling the HID++ communication,
 //! // we can detect it.
-//! let receiver = receiver::detect(Arc::clone(&channel)).expect("no receiver was found");
+//! let receiver = receiver::detect(Arc::clone(&channel)).expect("no receiver
+//! was found");
 //!
-//! // Assuming we have a Bolt receiver, we will now detect all connected devices.
-//! let Receiver::Bolt(bolt) = receiver else {
+//! // Assuming we have a Bolt receiver, we will now detect all connected
+//! devices. let Receiver::Bolt(bolt) = receiver else {
 //!     panic!("no Bolt receiver");
 //! };
 //! tokio::spawn({
@@ -89,8 +101,8 @@
 //!     .await
 //!     .expect("could not trigger device arrival notification");
 //!
-//! // Let's say we found a device with the index 0x02 using this enumeration. We
-//! // can now initialize it:
+//! // Let's say we found a device with the index 0x02 using this enumeration.
+//! We // can now initialize it:
 //! let mut device = Device::new(Arc::clone(&channel), 0x02)
 //!     .await
 //!     .expect("could not initialize device");
@@ -112,8 +124,8 @@
 //!     .expect("could not look up feature")
 //!     .expect("FeatureSet feature is not supported");
 //!
-//! // As there are a lot of possible features and a given device only supports a
-//! // small subset of these, looking up every single feature ID using this
+//! // As there are a lot of possible features and a given device only supports
+//! a // small subset of these, looking up every single feature ID using this
 //! // technique is not practicable. That's why the `IFeatureSet` feature can be
 //! // used to enumerate over all supported features, but only if this feature
 //! // itself is supported by the device.
@@ -126,9 +138,9 @@
 //! // This crate provides Rust implementations for many HID++2.0 features. A
 //! // registry in the `hidpp::feature::registry` module maintains a list of all
 //! // known features and, if provided, a link to its implementation. The
-//! // `enumerate_features` function we just called automatically registers these
-//! // implementations for our device and we can now access them like this:
-//! let thumbwheel = device
+//! // `enumerate_features` function we just called automatically registers
+//! these // implementations for our device and we can now access them like
+//! this: let thumbwheel = device
 //!     .get_feature::<ThumbwheelFeatureV0>()
 //!     .expect("Thumbwheel feature is not supported");
 //! thumbwheel
@@ -136,7 +148,7 @@
 //!     .await
 //!     .expect("could not divert thumbwheel");
 //! ```
-//!
+//! 
 //! That should cover the basic use case of this crate.
 
 pub use async_trait::async_trait;
