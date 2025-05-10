@@ -2,6 +2,11 @@
 name = "hidpp"
 version = "0.1.0"
 edition = "2024"
+description = "An implementation of the HID++ protocol used by Logitech devices"
+license-file = "../LICENSE"
+repository = "https://github.com/lus/logy"
+keywords = ["hid++", "logitech", "hid", "mouse", "keyboard"]
+categories = ["hardware-support"]
 
 [dependencies]
 thiserror = "2"
