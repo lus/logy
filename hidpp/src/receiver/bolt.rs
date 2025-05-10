@@ -50,6 +50,7 @@ pub enum BoltInfoSubRegister {
 }
 
 /// Implements the Bolt wireless receiver.
+#[derive(Clone)]
 pub struct BoltReceiver {
     channel: Arc<HidppChannel>,
 }
