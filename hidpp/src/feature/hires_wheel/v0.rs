@@ -1,9 +1,6 @@
 //! Implements the feature starting with version 0.
 
-use std::{
-    hash::Hash,
-    sync::{Arc, Mutex, mpsc},
-};
+use std::{hash::Hash, sync::Arc};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -30,8 +27,11 @@ pub struct HiResWheelFeatureV0 {
     /// The index of the feature in the feature table.
     feature_index: u8,
 
-    /// A collection of event listeners added via [`Self::listen`].
-    listeners: Arc<Mutex<Vec<mpsc::Sender<HiResWheelEvent>>>>,
+    /// The TX/RX pair for emitting [`HiResWheelEvent`]s.
+    events: (
+        flume::Sender<HiResWheelEvent>,
+        flume::Receiver<HiResWheelEvent>,
+    ),
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -44,10 +44,10 @@ impl CreatableFeature for HiResWheelFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let listeners_rc = Arc::new(Mutex::new(Vec::<mpsc::Sender<HiResWheelEvent>>::new()));
+        let (tx, rx) = flume::unbounded();
 
         let hdl = chan.add_msg_listener({
-            let listeners = Arc::clone(&listeners_rc);
+            let tx = tx.clone();
 
             move |raw, matched| {
                 if matched {
@@ -90,10 +90,7 @@ impl CreatableFeature for HiResWheelFeatureV0 {
                     _ => return,
                 };
 
-                listeners
-                    .lock()
-                    .unwrap()
-                    .retain(|listener| listener.send(event).is_ok());
+                let _ = tx.send(event);
             }
         });
 
@@ -101,7 +98,7 @@ impl CreatableFeature for HiResWheelFeatureV0 {
             chan,
             device_index,
             feature_index,
-            listeners: listeners_rc,
+            events: (tx, rx),
             msg_listener_hdl: hdl,
         }
     }
@@ -111,10 +108,8 @@ impl Feature for HiResWheelFeatureV0 {
 }
 
 impl EmittingFeature<HiResWheelEvent> for HiResWheelFeatureV0 {
-    fn listen(&self) -> mpsc::Receiver<HiResWheelEvent> {
-        let (tx, rx) = mpsc::channel::<HiResWheelEvent>();
-        self.listeners.lock().unwrap().push(tx);
-        rx
+    fn listen(&self) -> flume::Receiver<HiResWheelEvent> {
+        self.events.1.clone()
     }
 }
 

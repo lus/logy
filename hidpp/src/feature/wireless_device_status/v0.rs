@@ -1,6 +1,6 @@
 //! Implements the feature starting with version 0.
 
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::Arc;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -18,8 +18,11 @@ pub struct WirelessDeviceStatusFeatureV0 {
     /// The underlying HID++ channel.
     chan: Arc<HidppChannel>,
 
-    /// A collection of event listeners added via [`Self::listen`].
-    listeners: Arc<Mutex<Vec<mpsc::Sender<WirelessDeviceStatusEvent>>>>,
+    /// The TX/RX pair for emitting [`WirelessDeviceStatusEvent`]s.
+    events: (
+        flume::Sender<WirelessDeviceStatusEvent>,
+        flume::Receiver<WirelessDeviceStatusEvent>,
+    ),
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -32,12 +35,10 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let listeners_rc = Arc::new(Mutex::new(
-            Vec::<mpsc::Sender<WirelessDeviceStatusEvent>>::new(),
-        ));
+        let (tx, rx) = flume::unbounded();
 
         let hdl = chan.add_msg_listener({
-            let listeners = Arc::clone(&listeners_rc);
+            let tx = tx.clone();
 
             move |raw, matched| {
                 if matched {
@@ -65,23 +66,19 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
                     return;
                 };
 
-                listeners.lock().unwrap().retain(|listener| {
-                    listener
-                        .send(WirelessDeviceStatusEvent::StatusBroadcast(
-                            WirelessDeviceStatusBroadcast {
-                                status,
-                                request,
-                                reason,
-                            },
-                        ))
-                        .is_ok()
-                });
+                let _ = tx.send(WirelessDeviceStatusEvent::StatusBroadcast(
+                    WirelessDeviceStatusBroadcast {
+                        status,
+                        request,
+                        reason,
+                    },
+                ));
             }
         });
 
         Self {
             chan,
-            listeners: listeners_rc,
+            events: (tx, rx),
             msg_listener_hdl: hdl,
         }
     }
@@ -91,10 +88,8 @@ impl Feature for WirelessDeviceStatusFeatureV0 {
 }
 
 impl EmittingFeature<WirelessDeviceStatusEvent> for WirelessDeviceStatusFeatureV0 {
-    fn listen(&self) -> mpsc::Receiver<WirelessDeviceStatusEvent> {
-        let (tx, rx) = mpsc::channel::<WirelessDeviceStatusEvent>();
-        self.listeners.lock().unwrap().push(tx);
-        rx
+    fn listen(&self) -> flume::Receiver<WirelessDeviceStatusEvent> {
+        self.events.1.clone()
     }
 }
 

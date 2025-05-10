@@ -1,9 +1,6 @@
 //! Specific device feature implementations.
 
-use std::{
-    any::Any,
-    sync::{Arc, mpsc},
-};
+use std::{any::Any, sync::Arc};
 
 use crate::channel::HidppChannel;
 
@@ -38,10 +35,7 @@ pub trait CreatableFeature: Feature {
 pub trait EmittingFeature<T>: Feature {
     /// Creates a receiver that is being notified whenever a new event of type
     /// `T` is emitted by the feature.
-    ///
-    /// If the receiver is dropped, it is automatically removed from the
-    /// internal listener collection as soon as the next event occurs.
-    fn listen(&self) -> mpsc::Receiver<T>;
+    fn listen(&self) -> flume::Receiver<T>;
 }
 
 /// A bitfield describing some properties of a feature.
