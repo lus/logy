@@ -17,6 +17,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use super::{RECEIVER_DEVICE_INDEX, ReceiverError};
 use crate::{
     channel::HidppChannel,
+    event::EventEmitter,
     nibble::U4,
     protocol::v10::{self, Hidpp10Error},
 };
@@ -69,8 +70,8 @@ pub struct BoltReceiver {
     /// The underlying HID++ channel.
     chan: Arc<HidppChannel>,
 
-    /// The TX/RX pair for emitting [`BoltEvent`]s.
-    events: (flume::Sender<BoltEvent>, flume::Receiver<BoltEvent>),
+    /// The emitter used to emit events.
+    emitter: Arc<EventEmitter<BoltEvent>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -89,10 +90,10 @@ impl BoltReceiver {
             return Err(ReceiverError::UnknownReceiver);
         }
 
-        let (tx, rx) = flume::unbounded();
+        let emitter = Arc::new(EventEmitter::new());
 
         let hdl = chan.add_msg_listener({
-            let tx = tx.clone();
+            let emitter = Arc::clone(&emitter);
 
             move |raw, matched| {
                 if matched {
@@ -110,7 +111,7 @@ impl BoltReceiver {
                             return;
                         };
 
-                        let _ = tx.send(BoltEvent::DeviceConnection(BoltDeviceConnection {
+                        emitter.emit(BoltEvent::DeviceConnection(BoltDeviceConnection {
                             index: header.device_index,
                             kind,
                             encrypted: payload[1] & (1 << 5) != 0,
@@ -125,14 +126,14 @@ impl BoltReceiver {
 
         Ok(BoltReceiver {
             chan,
-            events: (tx, rx),
+            emitter,
             msg_listener_hdl: hdl,
         })
     }
 
     /// Creates a new listener for receiving Bolt receiver events.
-    pub fn listen(&self) -> flume::Receiver<BoltEvent> {
-        self.events.1.clone()
+    pub fn listen(&self) -> async_channel::Receiver<BoltEvent> {
+        self.emitter.create_receiver()
     }
 
     /// Counts the amount of devices currently paired to this receiver. The

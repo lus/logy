@@ -6,6 +6,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     channel::HidppChannel,
+    event::EventEmitter,
     feature::{CreatableFeature, EmittingFeature, Feature},
     nibble::U4,
     protocol::v20::{self, Hidpp20Error},
@@ -27,11 +28,8 @@ pub struct HiResWheelFeatureV0 {
     /// The index of the feature in the feature table.
     feature_index: u8,
 
-    /// The TX/RX pair for emitting [`HiResWheelEvent`]s.
-    events: (
-        flume::Sender<HiResWheelEvent>,
-        flume::Receiver<HiResWheelEvent>,
-    ),
+    /// The emitter used to emit events.
+    emitter: Arc<EventEmitter<HiResWheelEvent>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -44,10 +42,10 @@ impl CreatableFeature for HiResWheelFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let (tx, rx) = flume::unbounded();
+        let emitter = Arc::new(EventEmitter::new());
 
         let hdl = chan.add_msg_listener({
-            let tx = tx.clone();
+            let emitter = Arc::clone(&emitter);
 
             move |raw, matched| {
                 if matched {
@@ -90,7 +88,7 @@ impl CreatableFeature for HiResWheelFeatureV0 {
                     _ => return,
                 };
 
-                let _ = tx.send(event);
+                emitter.emit(event);
             }
         });
 
@@ -98,7 +96,7 @@ impl CreatableFeature for HiResWheelFeatureV0 {
             chan,
             device_index,
             feature_index,
-            events: (tx, rx),
+            emitter,
             msg_listener_hdl: hdl,
         }
     }
@@ -108,8 +106,8 @@ impl Feature for HiResWheelFeatureV0 {
 }
 
 impl EmittingFeature<HiResWheelEvent> for HiResWheelFeatureV0 {
-    fn listen(&self) -> flume::Receiver<HiResWheelEvent> {
-        self.events.1.clone()
+    fn listen(&self) -> async_channel::Receiver<HiResWheelEvent> {
+        self.emitter.create_receiver()
     }
 }
 

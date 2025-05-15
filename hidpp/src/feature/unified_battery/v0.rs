@@ -6,6 +6,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     channel::HidppChannel,
+    event::EventEmitter,
     feature::{CreatableFeature, EmittingFeature, Feature},
     nibble::{self, U4},
     protocol::v20::{self, Hidpp20Error},
@@ -24,8 +25,8 @@ pub struct UnifiedBatteryFeatureV0 {
     /// The index of the feature in the feature table.
     feature_index: u8,
 
-    /// The TX/RX pair for emitting [`BatteryEvent`]s.
-    events: (flume::Sender<BatteryEvent>, flume::Receiver<BatteryEvent>),
+    /// The emitter used to emit events.
+    emitter: Arc<EventEmitter<BatteryEvent>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -38,10 +39,10 @@ impl CreatableFeature for UnifiedBatteryFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let (tx, rx) = flume::unbounded();
+        let emitter = Arc::new(EventEmitter::new());
 
         let hdl = chan.add_msg_listener({
-            let tx = tx.clone();
+            let emitter = Arc::clone(&emitter);
 
             move |raw, matched| {
                 if matched {
@@ -66,7 +67,7 @@ impl CreatableFeature for UnifiedBatteryFeatureV0 {
                     return;
                 };
 
-                let _ = tx.send(BatteryEvent::InfoUpdate(BatteryInfo {
+                emitter.emit(BatteryEvent::InfoUpdate(BatteryInfo {
                     charging_percentage: payload[0],
                     level,
                     status,
@@ -78,7 +79,7 @@ impl CreatableFeature for UnifiedBatteryFeatureV0 {
             chan,
             device_index,
             feature_index,
-            events: (tx, rx),
+            emitter,
             msg_listener_hdl: hdl,
         }
     }
@@ -88,8 +89,8 @@ impl Feature for UnifiedBatteryFeatureV0 {
 }
 
 impl EmittingFeature<BatteryEvent> for UnifiedBatteryFeatureV0 {
-    fn listen(&self) -> flume::Receiver<BatteryEvent> {
-        self.events.1.clone()
+    fn listen(&self) -> async_channel::Receiver<BatteryEvent> {
+        self.emitter.create_receiver()
     }
 }
 

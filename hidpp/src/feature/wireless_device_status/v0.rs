@@ -6,6 +6,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     channel::HidppChannel,
+    event::EventEmitter,
     feature::{CreatableFeature, EmittingFeature, Feature},
     nibble,
     protocol::v20,
@@ -18,11 +19,8 @@ pub struct WirelessDeviceStatusFeatureV0 {
     /// The underlying HID++ channel.
     chan: Arc<HidppChannel>,
 
-    /// The TX/RX pair for emitting [`WirelessDeviceStatusEvent`]s.
-    events: (
-        flume::Sender<WirelessDeviceStatusEvent>,
-        flume::Receiver<WirelessDeviceStatusEvent>,
-    ),
+    /// The emitter used to emit events.
+    emitter: Arc<EventEmitter<WirelessDeviceStatusEvent>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -35,10 +33,10 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let (tx, rx) = flume::unbounded();
+        let emitter = Arc::new(EventEmitter::new());
 
         let hdl = chan.add_msg_listener({
-            let tx = tx.clone();
+            let emitter = Arc::clone(&emitter);
 
             move |raw, matched| {
                 if matched {
@@ -66,7 +64,7 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
                     return;
                 };
 
-                let _ = tx.send(WirelessDeviceStatusEvent::StatusBroadcast(
+                emitter.emit(WirelessDeviceStatusEvent::StatusBroadcast(
                     WirelessDeviceStatusBroadcast {
                         status,
                         request,
@@ -78,7 +76,7 @@ impl CreatableFeature for WirelessDeviceStatusFeatureV0 {
 
         Self {
             chan,
-            events: (tx, rx),
+            emitter,
             msg_listener_hdl: hdl,
         }
     }
@@ -88,8 +86,8 @@ impl Feature for WirelessDeviceStatusFeatureV0 {
 }
 
 impl EmittingFeature<WirelessDeviceStatusEvent> for WirelessDeviceStatusFeatureV0 {
-    fn listen(&self) -> flume::Receiver<WirelessDeviceStatusEvent> {
-        self.events.1.clone()
+    fn listen(&self) -> async_channel::Receiver<WirelessDeviceStatusEvent> {
+        self.emitter.create_receiver()
     }
 }
 

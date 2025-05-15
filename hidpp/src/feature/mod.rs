@@ -35,7 +35,7 @@ pub trait CreatableFeature: Feature {
 pub trait EmittingFeature<T>: Feature {
     /// Creates a receiver that is being notified whenever a new event of type
     /// `T` is emitted by the feature.
-    fn listen(&self) -> flume::Receiver<T>;
+    fn listen(&self) -> async_channel::Receiver<T>;
 }
 
 /// A bitfield describing some properties of a feature.

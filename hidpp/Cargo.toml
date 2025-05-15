@@ -1,6 +1,6 @@
 [package]
 name = "hidpp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "An implementation of the HID++ protocol used by Logitech devices"
 license-file = "../LICENSE"
@@ -16,7 +16,4 @@ async-trait = "0.1.88"
 rand = "0.9.0"
 lazy_static = "1.5.0"
 num_enum = "0.7.3"
-flume = { version = "0.11.1", default-features = false, features = [
-    "async",
-    "select",
-] }
+async-channel = "2.3.1"

@@ -6,6 +6,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     channel::HidppChannel,
+    event::EventEmitter,
     feature::{CreatableFeature, EmittingFeature, Feature},
     nibble::{self, U4},
     protocol::v20::{self, Hidpp20Error},
@@ -24,11 +25,8 @@ pub struct ThumbwheelFeatureV0 {
     /// The index of the feature in the feature table.
     feature_index: u8,
 
-    /// The TX/RX pair for emitting [`ThumbwheelEvent`]s.
-    events: (
-        flume::Sender<ThumbwheelEvent>,
-        flume::Receiver<ThumbwheelEvent>,
-    ),
+    /// The emitter used to emit events.
+    emitter: Arc<EventEmitter<ThumbwheelEvent>>,
 
     /// The handle assigned to the message listener registered via
     /// [`HidppChannel::add_msg_listener`].
@@ -41,10 +39,10 @@ impl CreatableFeature for ThumbwheelFeatureV0 {
     const STARTING_VERSION: u8 = 0;
 
     fn new(chan: Arc<HidppChannel>, device_index: u8, feature_index: u8) -> Self {
-        let (tx, rx) = flume::unbounded();
+        let emitter = Arc::new(EventEmitter::new());
 
         let hdl = chan.add_msg_listener({
-            let tx = tx.clone();
+            let emitter = Arc::clone(&emitter);
 
             move |raw, matched| {
                 if matched {
@@ -66,7 +64,7 @@ impl CreatableFeature for ThumbwheelFeatureV0 {
                     return;
                 };
 
-                let _ = tx.send(ThumbwheelEvent::StatusUpdate(ThumbwheelStatusUpdate {
+                emitter.emit(ThumbwheelEvent::StatusUpdate(ThumbwheelStatusUpdate {
                     rotation: i16::from_be_bytes(payload[0..=1].try_into().unwrap()),
                     time_elapsed: u16::from_be_bytes(payload[2..=3].try_into().unwrap()),
                     rotation_status,
@@ -81,7 +79,7 @@ impl CreatableFeature for ThumbwheelFeatureV0 {
             chan,
             device_index,
             feature_index,
-            events: (tx, rx),
+            emitter,
             msg_listener_hdl: hdl,
         }
     }
@@ -91,8 +89,8 @@ impl Feature for ThumbwheelFeatureV0 {
 }
 
 impl EmittingFeature<ThumbwheelEvent> for ThumbwheelFeatureV0 {
-    fn listen(&self) -> flume::Receiver<ThumbwheelEvent> {
-        self.events.1.clone()
+    fn listen(&self) -> async_channel::Receiver<ThumbwheelEvent> {
+        self.emitter.create_receiver()
     }
 }
 
