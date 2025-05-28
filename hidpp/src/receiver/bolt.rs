@@ -184,7 +184,7 @@ impl BoltReceiver {
 
         // I have no clue how to retrieve the serial number of the receiver.
 
-        Ok(core::str::from_utf8(&response)
+        Ok(str::from_utf8(&response)
             .map_err(|_| Hidpp10Error::UnsupportedResponse)?
             .to_string())
     }
@@ -229,7 +229,7 @@ impl BoltReceiver {
             .await?;
 
         let end_idx = response[2] as usize;
-        Ok(core::str::from_utf8(&response[3..end_idx])
+        Ok(str::from_utf8(&response[3..end_idx])
             .map_err(|_| Hidpp10Error::UnsupportedResponse)?
             .to_string())
     }
