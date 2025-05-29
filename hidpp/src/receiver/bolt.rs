@@ -41,6 +41,12 @@ pub enum BoltRegister {
     /// between different kinds of information.
     ReceiverInfo = 0xb5,
 
+    /// Provides support for discovering devices that are ready to pair.
+    DeviceDiscovery = 0xc0,
+
+    /// Provides pairing and unpairing support.
+    Pairing = 0xc1,
+
     /// Provides the unique ID of the receiver.
     ///
     /// Exposed by [`BoltReceiver::get_unique_id`].
@@ -100,9 +106,13 @@ impl BoltReceiver {
                     return;
                 }
 
-                let v10::Message::Short(header, payload) = v10::Message::from(raw) else {
+                let parsed = v10::Message::from(raw);
+                let header = parsed.header();
+                let payload = parsed.extend_payload();
+
+                if header.device_index != RECEIVER_DEVICE_INDEX && header.sub_id != 0x41 {
                     return;
-                };
+                }
 
                 match header.sub_id {
                     // Device connection
@@ -118,6 +128,110 @@ impl BoltReceiver {
                             online: payload[1] & (1 << 6) == 0,
                             wpid: u16::from_le_bytes(payload[2..=3].try_into().unwrap()),
                         }));
+                    },
+                    // Device discovery
+                    0x4f => {
+                        match payload[2] {
+                            // Device data
+                            0 => {
+                                let Ok(kind) = BoltDeviceKind::try_from(payload[4] & 0x0f) else {
+                                    return;
+                                };
+
+                                // I have no idea what payload[2]. payload[12], payload[13] and
+                                // payload[15] contain.
+                                // Last one seems to change marginally, maybe some kind of
+                                // connection metric?
+
+                                emitter.emit(BoltEvent::DeviceDiscoveryDeviceDetails(
+                                    BoltDeviceDiscoveryDeviceDetails {
+                                        counter: payload[0] as u16 + payload[1] as u16 * 256,
+                                        kind,
+                                        wpid: u16::from_le_bytes(
+                                            payload[5..=6].try_into().unwrap(),
+                                        ),
+                                        address: payload[7..=12].try_into().unwrap(),
+                                        authentication: payload[15],
+                                    },
+                                ));
+                            },
+                            // Device name
+                            1 => {
+                                let Ok(name) =
+                                    str::from_utf8(&payload[4..(4 + payload[3] as usize)])
+                                else {
+                                    return;
+                                };
+
+                                emitter.emit(BoltEvent::DeviceDiscoveryDeviceName(
+                                    BoltDeviceDiscoveryDeviceName {
+                                        counter: payload[0] as u16 + payload[1] as u16 * 256,
+                                        name: name.to_string(),
+                                    },
+                                ));
+                            },
+                            _ => (),
+                        }
+                    },
+                    // Device discovery status
+                    0x53 => {
+                        emitter.emit(BoltEvent::DeviceDiscoveryStatus(
+                            BoltDeviceDiscoveryStatus {
+                                discovery_enabled: payload[0] == 0x00,
+                            },
+                        ));
+                    },
+                    // Pairing status
+                    0x54 => {
+                        // payload[0] contains some kind of information about the status. I don't
+                        // know how to map that though.
+
+                        let error = if payload[1] == 0x00 {
+                            None
+                        } else {
+                            let Ok(parsed) = BoltPairingError::try_from(payload[1]) else {
+                                return;
+                            };
+
+                            Some(parsed)
+                        };
+
+                        emitter.emit(BoltEvent::PairingStatus(BoltPairingStatus {
+                            device_address: payload[2..=7].try_into().unwrap(),
+                            pairing_error: error,
+                            slot: if payload[8] == 0x00 {
+                                None
+                            } else {
+                                Some(payload[8])
+                            },
+                        }));
+                    },
+                    // Passkey request
+                    0x4d => {
+                        let Ok(passkey) = str::from_utf8(&payload[1..=6]) else {
+                            return;
+                        };
+
+                        emitter.emit(BoltEvent::PairingPasskeyRequest(
+                            BoltPairingPasskeyRequest {
+                                device_address: payload[7..=12].try_into().unwrap(),
+                                passkey: passkey.to_string(),
+                            },
+                        ));
+                    },
+                    // Passkey pressed
+                    0x4e => {
+                        let Ok(press_type) = BoltPairingPasskeyPressType::try_from(payload[0])
+                        else {
+                            return;
+                        };
+
+                        emitter.emit(BoltEvent::PairingPasskeyPressed(
+                            BoltPairingPasskeyPressed {
+                                device_address: payload[1..=6].try_into().unwrap(),
+                                press_type,
+                            },
+                        ));
                     },
                     _ => (),
                 }
@@ -233,6 +347,82 @@ impl BoltReceiver {
             .map_err(|_| Hidpp10Error::UnsupportedResponse)?
             .to_string())
     }
+
+    /// Unpairs a device from the receiver by its index.
+    pub async fn unpair_device(&self, device_index: U4) -> Result<(), ReceiverError> {
+        let mut payload = [0u8; 16];
+        payload[0] = 0x03;
+        payload[1] = device_index.to_lo();
+
+        self.chan
+            .write_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::Pairing.into(), payload)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Starts the pairing process for a new device.
+    ///
+    /// The required `address` and `authentication` values are usually
+    /// discovered from the [`BoltEvent::DeviceDiscoveryDeviceDetails`]
+    /// event which is emitted regularly when actively discovering available
+    /// devices ([`Self::discover_devices`]).
+    ///
+    /// `entropy` specifies how complex the authentication passkey should be.
+    /// For mice this defines the amount of keypresses (left or right) the user
+    /// has to perform. Not all values seem to be supported.
+    pub async fn pair_device(
+        &self,
+        slot: U4,
+        address: [u8; 6],
+        authentication: u8,
+        entropy: u8,
+    ) -> Result<(), ReceiverError> {
+        let mut payload = [0u8; 16];
+        payload[0] = 0x01;
+        payload[1] = slot.to_lo();
+        payload[2..=7].copy_from_slice(&address);
+        payload[8] = authentication;
+        payload[9] = entropy;
+
+        self.chan
+            .write_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::Pairing.into(), payload)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Starts device discovery for `timeout` ([`None`] = default, seems to be
+    /// 30s) seconds. The maximum supported value is 60s.
+    ///
+    /// While device discovery is enabled,
+    /// [`BoltEvent::DeviceDiscoveryDeviceDetails`] and
+    /// [`BoltEvent::DeviceDiscoveryDeviceName`] events are emitted for every
+    /// discovered device.
+    pub async fn discover_devices(&self, timeout: Option<u8>) -> Result<(), ReceiverError> {
+        self.chan
+            .write_register(
+                RECEIVER_DEVICE_INDEX,
+                BoltRegister::DeviceDiscovery.into(),
+                [timeout.unwrap_or(0x00), 0x01, 0x00],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    /// Cancels the device discovery process.
+    pub async fn cancel_device_discovery(&self) -> Result<(), ReceiverError> {
+        self.chan
+            .write_register(
+                RECEIVER_DEVICE_INDEX,
+                BoltRegister::DeviceDiscovery.into(),
+                [0x00, 0x02, 0x00],
+            )
+            .await?;
+
+        Ok(())
+    }
 }
 
 impl Drop for BoltReceiver {
@@ -247,7 +437,7 @@ impl Drop for BoltReceiver {
 #[non_exhaustive]
 pub struct BoltDevicePairingInformation {
     /// The wireless product ID of the device.
-    wpid: u16,
+    pub wpid: u16,
 
     /// The kind of the device.
     pub kind: BoltDeviceKind,
@@ -259,7 +449,7 @@ pub struct BoltDevicePairingInformation {
     pub online: bool,
 
     /// The unit ID of the device.
-    unit_id: [u8; 4],
+    pub unit_id: [u8; 4],
 }
 
 /// Represents the kind of a device paired with a Bolt receiver.
@@ -282,7 +472,7 @@ pub enum BoltDeviceKind {
 }
 
 /// Represents an event emitted by a Bolt receiver.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[non_exhaustive]
 pub enum BoltEvent {
     /// Is emitted whenever a device connects to or disconnects from the
@@ -292,6 +482,35 @@ pub enum BoltEvent {
     /// [`BoltReceiver::trigger_device_arrival`] to allow easy device
     /// enumeration.
     DeviceConnection(BoltDeviceConnection),
+
+    /// Is emitted whenever the device discovery status changes.
+    DeviceDiscoveryStatus(BoltDeviceDiscoveryStatus),
+
+    /// Is emitted many times for every device discovered using
+    /// [`BoltReceiver::discover_devices`].
+    ///
+    /// This event contains device details, including its address required to
+    /// start pairing. The [`BoltEvent::DeviceDiscoveryDeviceName`] event will
+    /// also be emitted and contains the device name.
+    DeviceDiscoveryDeviceDetails(BoltDeviceDiscoveryDeviceDetails),
+
+    /// Is emitted many times for every device discovered using
+    /// [`BoltReceiver::discover_devices`].
+    ///
+    /// This event only contains the device name. Device details will be
+    /// provided using the [`BoltEvent::DeviceDiscoveryDeviceDetails`] event.
+    DeviceDiscoveryDeviceName(BoltDeviceDiscoveryDeviceName),
+
+    /// Is emitted whenever the status of a pairing process changes.
+    PairingStatus(BoltPairingStatus),
+
+    /// Is emitted once the receiver requests a passkey to be entered on a
+    /// device that should be paired to it.
+    PairingPasskeyRequest(BoltPairingPasskeyRequest),
+
+    /// Is emitted for every keypress a user performs while entering a pairing
+    /// passkey.
+    PairingPasskeyPressed(BoltPairingPasskeyPressed),
 }
 
 /// Represents the data of the [`BoltEvent::DeviceConnection`] event.
@@ -312,4 +531,127 @@ pub struct BoltDeviceConnection {
 
     /// The wireless product ID of the device.
     pub wpid: u16,
+}
+
+/// Represents the data of the [`BoltEvent::DeviceDiscoveryStatus`] event.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub struct BoltDeviceDiscoveryStatus {
+    /// Whether device discovery is enabled.
+    pub discovery_enabled: bool,
+}
+
+/// Represents the data of the [`BoltEvent::DeviceDiscoveryDeviceDetails`]
+/// event.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub struct BoltDeviceDiscoveryDeviceDetails {
+    /// The incrementing event counter. This can be used to map
+    /// [`BoltEvent::DeviceDiscoveryDeviceDetails`] and
+    /// [`BoltEvent::DeviceDiscoveryDeviceName`] events.
+    pub counter: u16,
+
+    /// The kind of the discovered device.
+    pub kind: BoltDeviceKind,
+
+    /// The wireless product ID of the device.
+    pub wpid: u16,
+
+    /// The address of the device required to pair it using
+    /// [`BoltReceiver::pair_device`].
+    ///
+    /// This can also be used as the unique device identifier when collecting
+    /// discovered devices.
+    pub address: [u8; 6],
+
+    /// The authentication type(s) the device supports. Unfortunately, there is
+    /// not much information about this value and whether it is a single value
+    /// or a bitfield.
+    pub authentication: u8,
+}
+
+/// Represents the data of the [`BoltEvent::DeviceDiscoveryDeviceName`] event.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub struct BoltDeviceDiscoveryDeviceName {
+    /// The incrementing event counter. This can be used to map
+    /// [`BoltEvent::DeviceDiscoveryDeviceDetails`] and
+    /// [`BoltEvent::DeviceDiscoveryDeviceName`] events.
+    pub counter: u16,
+
+    /// The name of the discovered device.
+    pub name: String,
+}
+
+/// Represents the data of the [`BoltEvent::PairingStatus`] event.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub struct BoltPairingStatus {
+    /// The address of the device,
+    pub device_address: [u8; 6],
+
+    /// The error that occurred while trying to pair the device.
+    pub pairing_error: Option<BoltPairingError>,
+
+    /// The slot of the newly paired device.
+    pub slot: Option<u8>,
+}
+
+/// Represents an error that occurred while pairing a device.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, TryFromPrimitive, IntoPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
+pub enum BoltPairingError {
+    DeviceTimeout = 0x01,
+    Failed = 0x02,
+}
+
+/// Represents the data of the [`BoltEvent::PairingPasskeyRequest`] event.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub struct BoltPairingPasskeyRequest {
+    /// The address of the device.
+    pub device_address: [u8; 6],
+
+    /// The passkey the user has to enter in order to pair the device.
+    ///
+    /// Depending on the device and authentication type, this value has
+    /// different implications.
+    ///
+    /// For mice, this value will be a valid 6-digit number. After parsing this
+    /// into an integer, the (least significant) bits represent the sequence
+    /// of mouse presses (`0` = left, `1` = right) the user has to perform,
+    /// with an additional press of both mouse buttons simultaneously.\
+    /// The amount of bits significant to this equals to the `entropy` passed to
+    /// [`BoltReceiver::pair_device`].
+    pub passkey: String,
+}
+
+/// Represents the data of the [`BoltEvent::PairingPasskeyPressed`] event.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[non_exhaustive]
+pub struct BoltPairingPasskeyPressed {
+    /// The address of the device.
+    pub device_address: [u8; 6],
+
+    /// The type of the keypress the user performed.
+    ///
+    /// Every passkey sequence starts with an event where this value is set to
+    /// [`BoltPairingPasskeyPressType::Initialization`]. Each time the user
+    /// presses a key, an event with a press type of
+    /// [`BoltPairingPasskeyPressType::Keypress`] is emitted. Once the user
+    /// submits their passkey, this value will be
+    /// [`BoltPairingPasskeyPressType::Submit`].
+    pub press_type: BoltPairingPasskeyPressType,
+}
+
+/// The type of a passkey keypress as included in the
+/// [`BoltPairingPasskeyPressed`] event data.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, TryFromPrimitive, IntoPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
+pub enum BoltPairingPasskeyPressType {
+    Initialization = 0x00,
+    Keypress = 0x01,
+    Submit = 0x04,
 }

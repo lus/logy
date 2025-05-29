@@ -2,11 +2,11 @@ use std::sync::Mutex;
 
 /// A simple event emitter sending a single event to multiple MPSC channels.
 #[derive(Debug)]
-pub struct EventEmitter<T: Copy> {
+pub struct EventEmitter<T: Clone> {
     senders: Mutex<Vec<async_channel::Sender<T>>>,
 }
 
-impl<T: Copy> EventEmitter<T> {
+impl<T: Clone> EventEmitter<T> {
     pub fn new() -> Self {
         Self {
             senders: Mutex::new(Vec::new()),
@@ -26,6 +26,6 @@ impl<T: Copy> EventEmitter<T> {
     /// removed from the list.
     pub fn emit(&self, event: T) {
         let mut senders = self.senders.lock().unwrap();
-        senders.retain(|sender| sender.send_blocking(event).is_ok());
+        senders.retain(|sender| sender.send_blocking(event.clone()).is_ok());
     }
 }
