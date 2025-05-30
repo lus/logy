@@ -4,21 +4,21 @@
 //! support up to 6 paired devices, but Bolt uses BTLE technology and introduces
 //! so-called passkeys for authenticating devices before pairing them.
 //!
-//! There is little to no public documentation about what registers Bolt support
-//! (and they seem to differ quite substantially from registers supported by
-//! Unifying and other receivers), so this implementation is based largely on
-//! information gathered by looking at other codebases (primarily Solaar) and
-//! searching registers by fuzzing them.
+//! There is little to no public documentation about what registers Bolt
+//! supports (and they seem to differ quite substantially from registers
+//! supported by Unifying and other receivers), so this implementation is based
+//! largely on information gathered by looking at other codebases (primarily
+//! Solaar) and searching registers by fuzzing them.
 
 use std::sync::Arc;
 
+use futures::{FutureExt, pin_mut, select};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use super::{RECEIVER_DEVICE_INDEX, ReceiverError};
 use crate::{
     channel::HidppChannel,
     event::EventEmitter,
-    nibble::U4,
     protocol::v10::{self, Hidpp10Error},
 };
 
@@ -278,6 +278,38 @@ impl BoltReceiver {
         Ok(())
     }
 
+    /// Collects information about all paired devices by calling
+    /// [`Self::trigger_device_arrival`] and collecting incoming
+    /// [`BoltEvent::DeviceConnection`] events.
+    pub async fn collect_paired_devices(&self) -> Result<Vec<BoltDeviceConnection>, ReceiverError> {
+        // The idea here is that, when triggering fake device arrival notifications, the
+        // receiver will send the register write confirmation message only AFTER sending
+        // all arrival notifications.
+        // So we will trigger device arrival notifications and continue collecting those
+        // until the original future has completed.
+
+        let mut devices = vec![];
+
+        let rx = self.listen();
+        let fin = self.trigger_device_arrival().fuse();
+        pin_mut!(fin);
+
+        loop {
+            select! {
+                _ = fin => break,
+                res = rx.recv().fuse() => {
+                    let Ok(BoltEvent::DeviceConnection(connection)) = res else {
+                        continue;
+                    };
+
+                    devices.push(connection);
+                }
+            }
+        }
+
+        Ok(devices)
+    }
+
     /// Provides the unique ID of the receiver.
     pub async fn get_unique_id(&self) -> Result<String, ReceiverError> {
         let response = self
@@ -306,12 +338,12 @@ impl BoltReceiver {
     /// Provides the pairing information of a specific paired device.
     pub async fn get_device_pairing_information(
         &self,
-        device_index: U4,
+        device_index: u8,
     ) -> Result<BoltDevicePairingInformation, ReceiverError> {
         let response = self
             .chan
             .read_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::ReceiverInfo.into(), [
-                u8::from(BoltInfoSubRegister::DevicePairingInformation) + device_index.to_lo(),
+                u8::from(BoltInfoSubRegister::DevicePairingInformation) + (device_index & 0x0f),
                 0x00,
                 0x00,
             ])
@@ -328,7 +360,7 @@ impl BoltReceiver {
     }
 
     /// Provides the codename of a specific paired device.
-    pub async fn get_device_codename(&self, device_index: U4) -> Result<String, ReceiverError> {
+    pub async fn get_device_codename(&self, device_index: u8) -> Result<String, ReceiverError> {
         // For device names longer than 13 characters this may need to be called
         // multiple times with different parameters. I don't have a device with
         // such a name to be able to test this.
@@ -336,7 +368,7 @@ impl BoltReceiver {
         let response = self
             .chan
             .read_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::ReceiverInfo.into(), [
-                u8::from(BoltInfoSubRegister::DeviceCodename) + device_index.to_lo(),
+                u8::from(BoltInfoSubRegister::DeviceCodename) + (device_index & 0x0f),
                 0x01,
                 0x00,
             ])
@@ -349,10 +381,10 @@ impl BoltReceiver {
     }
 
     /// Unpairs a device from the receiver by its index.
-    pub async fn unpair_device(&self, device_index: U4) -> Result<(), ReceiverError> {
+    pub async fn unpair_device(&self, device_index: u8) -> Result<(), ReceiverError> {
         let mut payload = [0u8; 16];
         payload[0] = 0x03;
-        payload[1] = device_index.to_lo();
+        payload[1] = device_index;
 
         self.chan
             .write_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::Pairing.into(), payload)
@@ -373,14 +405,14 @@ impl BoltReceiver {
     /// has to perform. Not all values seem to be supported.
     pub async fn pair_device(
         &self,
-        slot: U4,
+        slot: u8,
         address: [u8; 6],
         authentication: u8,
         entropy: u8,
     ) -> Result<(), ReceiverError> {
         let mut payload = [0u8; 16];
         payload[0] = 0x01;
-        payload[1] = slot.to_lo();
+        payload[1] = slot;
         payload[2..=7].copy_from_slice(&address);
         payload[8] = authentication;
         payload[9] = entropy;

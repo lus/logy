@@ -72,7 +72,7 @@ pub trait RawHidChannel: Sync + Send + 'static {
     /// Writes a raw report to the channel.
     ///
     /// Returns the exact amount of written bytes on success.
-    async fn write_report(&self, src: &[u8]) -> Result<usize, Box<dyn Error>>;
+    async fn write_report(&self, src: &[u8]) -> Result<usize, Box<dyn Error + Sync + Send>>;
 
     /// Reads a raw report from the channel.
     ///
@@ -81,7 +81,7 @@ pub trait RawHidChannel: Sync + Send + 'static {
     /// [`Self::read_report`].
     ///
     /// Returns the exact amount or read bytes on success.
-    async fn read_report(&self, buf: &mut [u8]) -> Result<usize, Box<dyn Error>>;
+    async fn read_report(&self, buf: &mut [u8]) -> Result<usize, Box<dyn Error + Sync + Send>>;
 
     /// If the implementation already knows whether the underlying HID channel
     /// supports HID++ messages, it should return `Some((supports_short,
@@ -95,7 +95,10 @@ pub trait RawHidChannel: Sync + Send + 'static {
     /// This is used to determine whether the channel supports HID++.
     ///
     /// Returns the exact size of the report descriptor on success.
-    async fn get_report_descriptor(&self, buf: &mut [u8]) -> Result<usize, Box<dyn Error>>;
+    async fn get_report_descriptor(
+        &self,
+        buf: &mut [u8],
+    ) -> Result<usize, Box<dyn Error + Sync + Send>>;
 }
 
 /// Checks whether a raw channel supports short or long HID++ messages.
@@ -487,7 +490,7 @@ pub enum ChannelError {
     /// Indicates that the concrete implementation of [`RawHidChannel`] returned
     /// an error.
     #[error("the HID channel implementation returned an error")]
-    Implementation(#[from] Box<dyn Error>),
+    Implementation(#[from] Box<dyn Error + Sync + Send>),
 
     /// Indicates that the HID report descriptor could not be parsed.
     #[error("the report descriptor could not be parsed")]
