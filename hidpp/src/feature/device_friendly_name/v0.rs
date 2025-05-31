@@ -106,7 +106,7 @@ impl DeviceFriendlyNameFeatureV0 {
             len = string.len();
         }
 
-        Ok(string)
+        Ok(string.trim_end_matches(char::from(0)).to_string())
     }
 
     /// Retrieves a chunk of characters of the default friendly name of the
@@ -150,7 +150,7 @@ impl DeviceFriendlyNameFeatureV0 {
             len = string.len();
         }
 
-        Ok(string)
+        Ok(string.trim_end_matches(char::from(0)).to_string())
     }
 
     /// Sets a chunk of the friendly device name, starting at a specific index

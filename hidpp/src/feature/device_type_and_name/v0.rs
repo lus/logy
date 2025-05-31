@@ -105,7 +105,7 @@ impl DeviceTypeAndNameFeatureV0 {
             len = string.len();
         }
 
-        Ok(string)
+        Ok(string.trim_end_matches(char::from(0)).to_string())
     }
 
     /// Retrieves the marketing type of the device.
