@@ -195,6 +195,7 @@ pub struct DeviceInformation {
 ///
 /// One given device can only support up to three transport protocols at a time.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct DeviceTransport {
     /// Whether the device supports USB.
@@ -226,6 +227,7 @@ impl From<u8> for DeviceTransport {
 /// Represents the bitfield stating which additional capabilities this feature
 /// supports.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct DeviceInformationCapabilities {
     /// Whether serial number retrieval is supported.
@@ -246,6 +248,7 @@ impl From<u8> for DeviceInformationCapabilities {
 /// Represents information about the firmware of a specific device entity as
 /// obtained via [`DeviceInformationFeatureV0::get_fw_info`].
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct DeviceEntityFirmwareInfo {
     /// The type of the described entity.
@@ -289,6 +292,7 @@ pub struct DeviceEntityFirmwareInfo {
 
 /// Represents the type of a device entity.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum DeviceEntityType {

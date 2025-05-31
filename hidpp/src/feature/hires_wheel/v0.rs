@@ -238,6 +238,7 @@ impl HiResWheelFeatureV0 {
 /// Represents the capabilities of the hi-res wheel and this feature as reported
 /// by [`HiResWheelFeatureV0::get_wheel_capabilities`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct WheelCapabilities {
     /// The report multiplier for the high-resolution mode. A single ratchet
@@ -265,6 +266,7 @@ pub struct WheelCapabilities {
 /// Represents the wheel mode as reported by
 /// [`HiResWheelFeatureV0::get_wheel_mode`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct WheelMode {
     /// Whether the scrolling direction is inverted.
@@ -280,6 +282,7 @@ pub struct WheelMode {
 
 /// Represents the resolution of the hi-res wheel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum WheelResolution {
@@ -289,6 +292,7 @@ pub enum WheelResolution {
 
 /// Represents the target of wheel movement reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum WheelEventTarget {
@@ -298,6 +302,7 @@ pub enum WheelEventTarget {
 
 /// Represents the state of the wheel ratchet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum WheelRatchetState {
@@ -307,6 +312,7 @@ pub enum WheelRatchetState {
 
 /// Represents an event emitted by the [`HiResWheelFeatureV0`] feature.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum HiResWheelEvent {
     /// Is emitted whenever the scroll wheel is moved in diverted HID++ mode.
@@ -320,6 +326,7 @@ pub enum HiResWheelEvent {
 
 /// Represents the data of the [`HiResWheelEvent::WheelMovement`] event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct WheelMovementData {
     /// The current resolution of the wheel.

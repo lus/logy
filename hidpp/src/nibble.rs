@@ -2,6 +2,7 @@
 
 /// Represents an unsigned 4-bit value (nibble) encoded as a byte.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct U4(u8);
 
 impl U4 {

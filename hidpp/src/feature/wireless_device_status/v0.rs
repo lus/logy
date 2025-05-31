@@ -100,6 +100,7 @@ impl Drop for WirelessDeviceStatusFeatureV0 {
 /// Represents an event emitted by the [`WirelessDeviceStatusFeatureV0`]
 /// feature.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum WirelessDeviceStatusEvent {
     /// Is emitted whenever a device (re)connects to the host.
@@ -111,6 +112,7 @@ pub enum WirelessDeviceStatusEvent {
 /// Represents the data of the [`WirelessDeviceStatusEvent::StatusBroadcast`]
 /// event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct WirelessDeviceStatusBroadcast {
     /// The status the device reports to be in.
@@ -126,6 +128,7 @@ pub struct WirelessDeviceStatusBroadcast {
 /// Represents a device status as reported in
 /// [`WirelessDeviceStatusBroadcast::status`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum WirelessDeviceStatus {
@@ -136,6 +139,7 @@ pub enum WirelessDeviceStatus {
 /// Represents a request as reported in
 /// [`WirelessDeviceStatusBroadcast::request`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum WirelessDeviceStatusRequest {
@@ -146,6 +150,7 @@ pub enum WirelessDeviceStatusRequest {
 /// Represents a broadcast reason as reported in
 /// [`WirelessDeviceStatusBroadcast::reason`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum WirelessDeviceStatusReason {

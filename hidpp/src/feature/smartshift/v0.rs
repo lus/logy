@@ -111,6 +111,7 @@ impl SmartShiftFeatureV0 {
 
 /// Represents the ratchet control mode of the mouse wheel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct RatchetControlMode {
     /// The mode the wheel is currently set to.
@@ -130,6 +131,7 @@ pub struct RatchetControlMode {
 
 /// Represents the ratchet mode of the scroll wheel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum WheelMode {

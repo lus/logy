@@ -131,6 +131,7 @@ impl DeviceTypeAndNameFeatureV0 {
 /// Represents the type of a HID++2.0 device as returned by the
 /// [`DeviceTypeAndNameFeatureV0`] feature.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum DeviceType {

@@ -240,6 +240,7 @@ impl DeviceFriendlyNameFeatureV0 {
 /// Represents the length data as returned by
 /// [`DeviceFriendlyNameFeatureV0::get_friendly_name_length`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct DeviceFriendlyNameLength {
     /// The current length of the friendly device name.

@@ -156,6 +156,7 @@ impl UnifiedBatteryFeatureV0 {
 
 /// Represents the capabilites of this feature and the battery itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BatteryCapabilities {
     /// All [`BatteryLevel`] variants the feature supports and reports.
@@ -195,6 +196,7 @@ impl From<[u8; 2]> for BatteryCapabilities {
 
 /// Represents infirmation about the current battery charge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BatteryInfo {
     /// The current charge of the battery in percent.
@@ -215,6 +217,7 @@ pub struct BatteryInfo {
 
 /// Represents an approximate level of the battery charge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BatteryLevel {
@@ -226,6 +229,7 @@ pub enum BatteryLevel {
 
 /// Represents the charging status of the battery.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BatteryStatus {
@@ -238,6 +242,7 @@ pub enum BatteryStatus {
 
 /// Represents an event emitted by the [`UnifiedBatteryFeatureV0`] feature.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum BatteryEvent {
     /// Is emitted whenever the battery information changes.

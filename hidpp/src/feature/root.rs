@@ -103,6 +103,7 @@ impl RootFeature {
 /// Represents information about a specific feature as returned by the
 /// [`RootFeature::get_feature`] function.
 #[derive(Clone, Copy, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct FeatureInformation {
     /// The index of the feature in the version table.

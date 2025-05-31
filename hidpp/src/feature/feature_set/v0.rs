@@ -97,6 +97,7 @@ impl FeatureSetFeatureV0 {
 /// Represents information about a specific feature as returned by the
 /// [`FeatureSetFeatureV0::get_feature`] function.
 #[derive(Clone, Copy, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct FeatureInformation {
     /// The protocol ID of the feature.

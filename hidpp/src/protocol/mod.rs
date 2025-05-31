@@ -12,6 +12,7 @@ pub mod v20;
 
 /// Represents the protocol version a device supports.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ProtocolVersion {
     /// The older HID++1.0 protocol. Mostly used for receivers.
     V10,

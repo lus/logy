@@ -10,6 +10,7 @@ use crate::{
 
 /// Represents the header that every [`HidppMessage`] of HID++2.0 starts with.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MessageHeader {
     /// The index of the device involved in the communication.
     pub device_index: u8,
@@ -29,6 +30,7 @@ pub struct MessageHeader {
 
 /// Represents a HID++2.0 message.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Message {
     /// Represents a short HID++2.0 message with 3 bytes of payload.
     Short(MessageHeader, [u8; SHORT_REPORT_LENGTH - 4]),
@@ -153,6 +155,7 @@ impl HidppChannel {
 /// Represents the type of an error a HID++2.0 device returns if a feature
 /// function fails.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum ErrorType {

@@ -28,6 +28,7 @@ pub const BOLT_VPID_PAIRS: &[(u16, u16)] = &[(0x046d, 0xc548)];
 
 /// Represents the known registers of the Bolt receiver.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BoltRegister {
@@ -56,6 +57,7 @@ pub enum BoltRegister {
 /// Represents the known sub-registers of the [`BoltRegister::ReceiverInfo`]
 /// register.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BoltInfoSubRegister {
@@ -466,6 +468,7 @@ impl Drop for BoltReceiver {
 /// Represents some information about a specific device pairing as returned by
 /// [`BoltReceiver::get_device_pairing_information`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltDevicePairingInformation {
     /// The wireless product ID of the device.
@@ -486,6 +489,7 @@ pub struct BoltDevicePairingInformation {
 
 /// Represents the kind of a device paired with a Bolt receiver.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BoltDeviceKind {
@@ -505,6 +509,7 @@ pub enum BoltDeviceKind {
 
 /// Represents an event emitted by a Bolt receiver.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum BoltEvent {
     /// Is emitted whenever a device connects to or disconnects from the
@@ -547,6 +552,7 @@ pub enum BoltEvent {
 
 /// Represents the data of the [`BoltEvent::DeviceConnection`] event.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltDeviceConnection {
     /// The index of the device used to communicate with it.
@@ -567,6 +573,7 @@ pub struct BoltDeviceConnection {
 
 /// Represents the data of the [`BoltEvent::DeviceDiscoveryStatus`] event.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltDeviceDiscoveryStatus {
     /// Whether device discovery is enabled.
@@ -576,6 +583,7 @@ pub struct BoltDeviceDiscoveryStatus {
 /// Represents the data of the [`BoltEvent::DeviceDiscoveryDeviceDetails`]
 /// event.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltDeviceDiscoveryDeviceDetails {
     /// The incrementing event counter. This can be used to map
@@ -604,6 +612,7 @@ pub struct BoltDeviceDiscoveryDeviceDetails {
 
 /// Represents the data of the [`BoltEvent::DeviceDiscoveryDeviceName`] event.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltDeviceDiscoveryDeviceName {
     /// The incrementing event counter. This can be used to map
@@ -617,6 +626,7 @@ pub struct BoltDeviceDiscoveryDeviceName {
 
 /// Represents the data of the [`BoltEvent::PairingStatus`] event.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltPairingStatus {
     /// The address of the device,
@@ -631,6 +641,7 @@ pub struct BoltPairingStatus {
 
 /// Represents an error that occurred while pairing a device.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, TryFromPrimitive, IntoPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BoltPairingError {
@@ -640,6 +651,7 @@ pub enum BoltPairingError {
 
 /// Represents the data of the [`BoltEvent::PairingPasskeyRequest`] event.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltPairingPasskeyRequest {
     /// The address of the device.
@@ -661,6 +673,7 @@ pub struct BoltPairingPasskeyRequest {
 
 /// Represents the data of the [`BoltEvent::PairingPasskeyPressed`] event.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct BoltPairingPasskeyPressed {
     /// The address of the device.
@@ -680,6 +693,7 @@ pub struct BoltPairingPasskeyPressed {
 /// The type of a passkey keypress as included in the
 /// [`BoltPairingPasskeyPressed`] event data.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, TryFromPrimitive, IntoPrimitive)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum BoltPairingPasskeyPressType {
