@@ -376,7 +376,7 @@ impl BoltReceiver {
             ])
             .await?;
 
-        let end_idx = response[2] as usize;
+        let end_idx = 3 + response[2] as usize;
         Ok(str::from_utf8(&response[3..end_idx])
             .map_err(|_| Hidpp10Error::UnsupportedResponse)?
             .to_string())
