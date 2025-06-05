@@ -24,13 +24,6 @@ pub mod bolt;
 /// The index to use when communicating with the receiver on any HID++ channel.
 pub const RECEIVER_DEVICE_INDEX: u8 = 0xff;
 
-/// Represents a HID++ wireless receiver.
-#[derive(Clone)]
-#[non_exhaustive]
-pub enum Receiver {
-    Bolt(BoltReceiver),
-}
-
 /// Tries to detect the receiver present on a HID++ channel.
 pub fn detect(chan: Arc<HidppChannel>) -> Option<Receiver> {
     if BOLT_VPID_PAIRS.contains(&(chan.vendor_id, chan.product_id)) {
@@ -41,6 +34,33 @@ pub fn detect(chan: Arc<HidppChannel>) -> Option<Receiver> {
     }
 
     None
+}
+
+/// Represents a HID++ wireless receiver.
+#[derive(Clone)]
+#[non_exhaustive]
+pub enum Receiver {
+    Bolt(BoltReceiver),
+}
+
+impl Receiver {
+    /// Provides a human-readable name for the receiver.
+    pub fn name(&self) -> String {
+        match self {
+            Self::Bolt(_) => "Logi Bolt Receiver",
+        }
+        .to_string()
+    }
+
+    /// Provides a string that uniquely identifies the specific receiver.
+    ///
+    /// This MAY be the serial number, but it may also be any other value that
+    /// is defined as unique.
+    pub async fn get_unique_id(&self) -> Result<String, ReceiverError> {
+        match self {
+            Self::Bolt(bolt) => bolt.get_unique_id().await,
+        }
+    }
 }
 
 /// Represents an error returned by a receiver.
