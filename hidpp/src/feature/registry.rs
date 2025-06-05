@@ -10,16 +10,16 @@ use crate::{
     channel::HidppChannel,
     feature::{
         CreatableFeature,
-        device_friendly_name::v0::DeviceFriendlyNameFeatureV0,
-        device_information::v0::DeviceInformationFeatureV0,
-        device_type_and_name::v0::DeviceTypeAndNameFeatureV0,
-        feature_set::v0::FeatureSetFeatureV0,
-        hires_wheel::v0::HiResWheelFeatureV0,
+        device_friendly_name::DeviceFriendlyNameFeature,
+        device_information::DeviceInformationFeature,
+        device_type_and_name::DeviceTypeAndNameFeature,
+        feature_set::FeatureSetFeature,
+        hires_wheel::HiResWheelFeature,
         root::RootFeature,
-        smartshift::v0::SmartShiftFeatureV0,
-        thumbwheel::v0::ThumbwheelFeatureV0,
-        unified_battery::v0::UnifiedBatteryFeatureV0,
-        wireless_device_status::v0::WirelessDeviceStatusFeatureV0,
+        smartshift::SmartShiftFeature,
+        thumbwheel::ThumbwheelFeature,
+        unified_battery::UnifiedBatteryFeature,
+        wireless_device_status::WirelessDeviceStatusFeature,
     },
 };
 
@@ -93,8 +93,8 @@ lazy_static! {
         (0x0001, KnownFeature {
             name: "FeatureSet",
             versions: &[FeatureVersion {
-                starting_version: FeatureSetFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<FeatureSetFeatureV0>
+                starting_version: FeatureSetFeature::STARTING_VERSION,
+                producer: new_dyn::<FeatureSetFeature>
             }]
         }),
         (0x0002, KnownFeature {
@@ -104,8 +104,8 @@ lazy_static! {
         (0x0003, KnownFeature {
             name: "DeviceInformation",
             versions: &[FeatureVersion {
-                starting_version: DeviceInformationFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<DeviceInformationFeatureV0>
+                starting_version: DeviceInformationFeature::STARTING_VERSION,
+                producer: new_dyn::<DeviceInformationFeature>
             }]
         }),
         (0x0004, KnownFeature {
@@ -115,8 +115,8 @@ lazy_static! {
         (0x0005, KnownFeature {
             name: "DeviceTypeAndName",
             versions: &[FeatureVersion {
-                starting_version: DeviceTypeAndNameFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<DeviceTypeAndNameFeatureV0>
+                starting_version: DeviceTypeAndNameFeature::STARTING_VERSION,
+                producer: new_dyn::<DeviceTypeAndNameFeature>
             }]
         }),
         (0x0006, KnownFeature {
@@ -126,8 +126,8 @@ lazy_static! {
         (0x0007, KnownFeature {
             name: "DeviceFriendlyName",
             versions: &[FeatureVersion {
-                starting_version: DeviceFriendlyNameFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<DeviceFriendlyNameFeatureV0>
+                starting_version: DeviceFriendlyNameFeature::STARTING_VERSION,
+                producer: new_dyn::<DeviceFriendlyNameFeature>
             }]
         }),
         (0x0008, KnownFeature {
@@ -185,8 +185,8 @@ lazy_static! {
         (0x1004, KnownFeature {
             name: "UnifiedBattery",
             versions: &[FeatureVersion {
-                starting_version: UnifiedBatteryFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<UnifiedBatteryFeatureV0>
+                starting_version: UnifiedBatteryFeature::STARTING_VERSION,
+                producer: new_dyn::<UnifiedBatteryFeature>
             }]
         }),
         (0x1010, KnownFeature {
@@ -276,8 +276,8 @@ lazy_static! {
         (0x1d4b, KnownFeature {
             name: "WirelessDeviceStatus",
             versions: &[FeatureVersion {
-                starting_version: WirelessDeviceStatusFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<WirelessDeviceStatusFeatureV0>
+                starting_version: WirelessDeviceStatusFeature::STARTING_VERSION,
+                producer: new_dyn::<WirelessDeviceStatusFeature>
             }]
         }),
         (0x1df0, KnownFeature {
@@ -311,8 +311,8 @@ lazy_static! {
         (0x2110, KnownFeature {
             name: "SmartShiftWheel",
             versions: &[FeatureVersion {
-                starting_version: SmartShiftFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<SmartShiftFeatureV0>
+                starting_version: SmartShiftFeature::STARTING_VERSION,
+                producer: new_dyn::<SmartShiftFeature>
             }]
         }),
         (0x2111, KnownFeature {
@@ -326,8 +326,8 @@ lazy_static! {
         (0x2121, KnownFeature {
             name: "HiResWheel",
             versions: &[FeatureVersion {
-                starting_version: HiResWheelFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<HiResWheelFeatureV0>
+                starting_version: HiResWheelFeature::STARTING_VERSION,
+                producer: new_dyn::<HiResWheelFeature>
             }]
         }),
         (0x2130, KnownFeature {
@@ -337,8 +337,8 @@ lazy_static! {
         (0x2150, KnownFeature {
             name: "Thumbwheel",
             versions: &[FeatureVersion {
-                starting_version: ThumbwheelFeatureV0::STARTING_VERSION,
-                producer: new_dyn::<ThumbwheelFeatureV0>
+                starting_version: ThumbwheelFeature::STARTING_VERSION,
+                producer: new_dyn::<ThumbwheelFeature>
             }]
         }),
         (0x2200, KnownFeature {

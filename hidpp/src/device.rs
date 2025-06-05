@@ -10,7 +10,7 @@ use crate::{
         self,
         CreatableFeature,
         Feature,
-        feature_set::v0::{FeatureInformation, FeatureSetFeatureV0},
+        feature_set::{FeatureInformation, FeatureSetFeature},
         root::RootFeature,
     },
     protocol::{self, ProtocolVersion, v20::Hidpp20Error},
@@ -133,11 +133,11 @@ impl Device {
     pub async fn enumerate_features(
         &mut self,
     ) -> Result<Option<Vec<FeatureInformation>>, Hidpp20Error> {
-        let Some(feature_set_info) = self.root().get_feature(FeatureSetFeatureV0::ID).await? else {
+        let Some(feature_set_info) = self.root().get_feature(FeatureSetFeature::ID).await? else {
             return Ok(None);
         };
 
-        let feature_set_feature = self.add_feature::<FeatureSetFeatureV0>(feature_set_info.index);
+        let feature_set_feature = self.add_feature::<FeatureSetFeature>(feature_set_info.index);
 
         let count = feature_set_feature.count().await?;
         let mut features = Vec::with_capacity(count as usize);
