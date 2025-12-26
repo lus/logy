@@ -53,11 +53,9 @@ impl ProbeCommand {
 
             writeln!(
                 stdout,
-                "{}: {} ({:#06x}:{:#06x})",
-                receiver.unique_id.bright_black(),
+                "{} ({})",
                 receiver.name,
-                receiver.vendor_id.bright_black(),
-                receiver.product_id.bright_black()
+                receiver.unique_id.bright_black()
             )
             .unwrap();
             writeln!(stdout, " │").unwrap();
@@ -69,7 +67,7 @@ impl ProbeCommand {
                     "No devices were found.".bright_black().italic()
                 )
                 .unwrap();
-                return Ok(());
+                continue;
             }
 
             let devices_len = receiver.paired_devices.len();
@@ -80,7 +78,7 @@ impl ProbeCommand {
 
                 writeln!(
                     stdout,
-                    "{} {}: {} {} ({:?}) ({:#06x})",
+                    "{} {}: {} {} ({:?})",
                     if device_i == devices_len - 1 {
                         " ╰─"
                     } else {
@@ -98,7 +96,6 @@ impl ProbeCommand {
                         device.name.bright_black().italic().to_string()
                     },
                     device.kind.green(),
-                    device.wpid.bright_black(),
                 )
                 .unwrap();
 
@@ -116,24 +113,22 @@ impl ProbeCommand {
                 if let Some(friendly_name) = device.properties.friendly_name {
                     properties.push(format!("FRIENDLY NAME: {}", friendly_name.bright_black()));
                 }
-                if let Some(battery_percentage) = device.properties.battery_percentage {
-                    if let Some(battery_level) = device.properties.battery_level {
-                        if let Some(battery_status) = device.properties.battery_status {
-                            properties.push(format!(
-                                "BATTERY: {:?} ({}), {:?}",
-                                match battery_level {
-                                    BatteryLevel::Full | BatteryLevel::Good =>
-                                        battery_level.green().into_styled(),
-                                    BatteryLevel::Low => battery_level.yellow().into_styled(),
-                                    BatteryLevel::Critical =>
-                                        battery_level.bright_red().into_styled(),
-                                    _ => battery_level.default_color().into_styled(),
-                                },
-                                format!("{}%", battery_percentage).blue(),
-                                battery_status.bright_black()
-                            ));
-                        }
-                    }
+                if let Some(battery_percentage) = device.properties.battery_percentage
+                    && let Some(battery_level) = device.properties.battery_level
+                    && let Some(battery_status) = device.properties.battery_status
+                {
+                    properties.push(format!(
+                        "BATTERY: {:?} ({}), {:?}",
+                        match battery_level {
+                            BatteryLevel::Full | BatteryLevel::Good =>
+                                battery_level.green().into_styled(),
+                            BatteryLevel::Low => battery_level.yellow().into_styled(),
+                            BatteryLevel::Critical => battery_level.bright_red().into_styled(),
+                            _ => battery_level.default_color().into_styled(),
+                        },
+                        format!("{}%", battery_percentage).blue(),
+                        battery_status.bright_black()
+                    ));
                 }
                 if let Some(serial_number) = device.properties.serial_number {
                     properties.push(format!("SERIAL NUMBER: {}", serial_number.bright_black()));

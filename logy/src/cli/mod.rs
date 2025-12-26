@@ -1,8 +1,11 @@
 mod probe;
+mod receiver;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use probe::ProbeCommand;
+
+use crate::cli::receiver::ReceiverCommand;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -13,7 +16,7 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Output plain JSON without color and interactivity
+    /// Output plain JSON without color and interactivity.
     #[arg(short, long, global = true)]
     json: bool,
 }
@@ -21,6 +24,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Probe(ProbeCommand),
+    Receiver(ReceiverCommand),
 }
 
 pub async fn execute() -> Result<()> {
@@ -30,5 +34,6 @@ pub async fn execute() -> Result<()> {
 
     match &cli.command {
         Commands::Probe(cmd) => cmd.execute(&cli).await,
+        Commands::Receiver(cmd) => cmd.execute(&cli).await,
     }
 }

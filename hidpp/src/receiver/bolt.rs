@@ -12,6 +12,7 @@
 
 use std::sync::Arc;
 
+use derive_builder::Builder;
 use futures::{FutureExt, pin_mut, select};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -22,79 +23,86 @@ use crate::{
     protocol::v10::{self, Hidpp10Error},
 };
 
-/// Contains all known USB vendor and product ID pairs representing Bolt
-/// receivers.
-pub const BOLT_VPID_PAIRS: &[(u16, u16)] = &[(0x046d, 0xc548)];
+/// All USB vendor & product ID pairs that are known to identify Bolt receivers.
+pub const VPID_PAIRS: &[(u16, u16)] = &[(0x046d, 0xc548)];
 
-/// Represents the known registers of the Bolt receiver.
+/// All known registers of the Bolt receiver.
+///
+/// In most cases you should not need to access these manually, as [`Receiver`]
+/// implements many features.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
-pub enum BoltRegister {
-    /// Provides information about the amount of currently paired devices.
+pub enum Register {
+    /// Allows control over what notifications the receiver sends.
+    Notifications = 0x00,
+
+    /// Provides the amount of currently paired devices.
     ///
-    /// This count is exposed by [`BoltReceiver::count_pairings`].
+    /// This is exposed by [`Receiver::count_pairings`].
     Connections = 0x02,
 
-    /// Provides information about the receiver and paired devices. It uses
-    /// sub-registers, as defined in [`BoltInfoSubRegister`], to differentiate
-    /// between different kinds of information.
+    /// Provides information about the receiver and paired devices.
+    ///
+    /// It uses sub-registers, as defined in [`InfoSubRegister`], to
+    /// differentiate between different kinds of information.
     ReceiverInfo = 0xb5,
 
     /// Provides support for discovering devices that are ready to pair.
+    ///
+    /// Use [`Receiver::discover_devices`] and
+    /// [`Receiver::cancel_device_discovery`] to control device discovery.
     DeviceDiscovery = 0xc0,
 
     /// Provides pairing and unpairing support.
+    ///
+    /// Use [`Receiver::pair_device`] and [`Receiver::unpair_device`] for
+    /// pairing and unpairing.
     Pairing = 0xc1,
 
-    /// Provides the unique ID of the receiver.
+    /// Exposes the unique ID of the receiver. This seems to differ from the
+    /// serial number.
     ///
-    /// Exposed by [`BoltReceiver::get_unique_id`].
+    /// Use [`Receiver::get_unique_id`] to query this value.
     UniqueId = 0xfb,
 }
 
-/// Represents the known sub-registers of the [`BoltRegister::ReceiverInfo`]
-/// register.
+/// All known sub-registers of the [`Register::ReceiverInfo`] register.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
-pub enum BoltInfoSubRegister {
-    /// Provides information about a specific paired device.
+pub enum InfoSubRegister {
+    /// Provides information about a specific paired device. The device index (4
+    /// bits) has to be added to the register address.
     ///
-    /// Exposed by [`BoltReceiver::get_device_pairing_information`].
+    /// Exposed by [`Receiver::get_device_pairing_information`].
     DevicePairingInformation = 0x50, // 0x5N with N = device index
 
-    /// Provides the name of a paired device.
+    /// Provides the name of a paired device. The device index (4
+    /// bits) has to be added to the register address.
     ///
-    /// Exposed by [`BoltReceiver::get_device_codename`].
+    /// Exposed by [`Receiver::get_device_codename`].
     DeviceCodename = 0x60, // 0x6N with N = device index
 }
 
-/// Implements the Bolt wireless receiver.
+/// Implements the Bolt receiver.
 #[derive(Clone)]
-pub struct BoltReceiver {
-    /// The underlying HID++ channel.
+pub struct Receiver {
     chan: Arc<HidppChannel>,
-
-    /// The emitter used to emit events.
-    emitter: Arc<EventEmitter<BoltEvent>>,
-
-    /// The handle assigned to the message listener registered via
-    /// [`HidppChannel::add_msg_listener`].
-    /// This is used to remove the listener when the receiver is dropped.
+    emitter: Arc<EventEmitter<Event>>,
     msg_listener_hdl: u32,
 }
 
-impl BoltReceiver {
-    /// Tries to initialize a new [`BoltReceiver`] from a raw HID++ channel.
+impl Receiver {
+    /// Tries to initialize a new [`Receiver`] from a raw HID++ channel.
     ///
     /// If no receiver could be found, or if the vendor and product IDs don't
     /// match the ones of any known Bolt receiver, this function will return
     /// [`ReceiverError::UnknownReceiver`].
     pub fn new(chan: Arc<HidppChannel>) -> Result<Self, ReceiverError> {
-        if !BOLT_VPID_PAIRS.contains(&(chan.vendor_id, chan.product_id)) {
+        if !VPID_PAIRS.contains(&(chan.vendor_id, chan.product_id)) {
             return Err(ReceiverError::UnknownReceiver);
         }
 
@@ -119,11 +127,11 @@ impl BoltReceiver {
                 match header.sub_id {
                     // Device connection
                     0x41 => {
-                        let Ok(kind) = BoltDeviceKind::try_from(payload[1] & 0x0f) else {
+                        let Ok(kind) = DeviceKind::try_from(payload[1] & 0x0f) else {
                             return;
                         };
 
-                        emitter.emit(BoltEvent::DeviceConnection(BoltDeviceConnection {
+                        emitter.emit(Event::DeviceConnection(DeviceConnection {
                             index: header.device_index,
                             kind,
                             encrypted: payload[1] & (1 << 5) != 0,
@@ -136,26 +144,17 @@ impl BoltReceiver {
                         match payload[2] {
                             // Device data
                             0 => {
-                                let Ok(kind) = BoltDeviceKind::try_from(payload[4] & 0x0f) else {
+                                let Ok(kind) = DeviceKind::try_from(payload[4] & 0x0f) else {
                                     return;
                                 };
 
-                                // I have no idea what payload[2]. payload[12], payload[13] and
-                                // payload[15] contain.
-                                // Last one seems to change marginally, maybe some kind of
-                                // connection metric?
-
-                                emitter.emit(BoltEvent::DeviceDiscoveryDeviceDetails(
-                                    BoltDeviceDiscoveryDeviceDetails {
-                                        counter: payload[0] as u16 + payload[1] as u16 * 256,
-                                        kind,
-                                        wpid: u16::from_le_bytes(
-                                            payload[5..=6].try_into().unwrap(),
-                                        ),
-                                        address: payload[7..=12].try_into().unwrap(),
-                                        authentication: payload[15],
-                                    },
-                                ));
+                                emitter.emit(Event::DeviceDiscoveryDeviceDetails {
+                                    counter: payload[0] as u16 + payload[1] as u16 * 256,
+                                    kind,
+                                    wpid: u16::from_le_bytes(payload[5..=6].try_into().unwrap()),
+                                    address: payload[7..=12].try_into().unwrap(),
+                                    authentication: payload[15],
+                                });
                             },
                             // Device name
                             1 => {
@@ -165,23 +164,19 @@ impl BoltReceiver {
                                     return;
                                 };
 
-                                emitter.emit(BoltEvent::DeviceDiscoveryDeviceName(
-                                    BoltDeviceDiscoveryDeviceName {
-                                        counter: payload[0] as u16 + payload[1] as u16 * 256,
-                                        name: name.to_string(),
-                                    },
-                                ));
+                                emitter.emit(Event::DeviceDiscoveryDeviceName {
+                                    counter: payload[0] as u16 + payload[1] as u16 * 256,
+                                    name: name.to_string(),
+                                });
                             },
                             _ => (),
                         }
                     },
                     // Device discovery status
                     0x53 => {
-                        emitter.emit(BoltEvent::DeviceDiscoveryStatus(
-                            BoltDeviceDiscoveryStatus {
-                                discovery_enabled: payload[0] == 0x00,
-                            },
-                        ));
+                        emitter.emit(Event::DeviceDiscoveryStatus {
+                            discovery_enabled: payload[0] == 0x00,
+                        });
                     },
                     // Pairing status
                     0x54 => {
@@ -191,14 +186,14 @@ impl BoltReceiver {
                         let error = if payload[1] == 0x00 {
                             None
                         } else {
-                            let Ok(parsed) = BoltPairingError::try_from(payload[1]) else {
+                            let Ok(parsed) = PairingError::try_from(payload[1]) else {
                                 return;
                             };
 
                             Some(parsed)
                         };
 
-                        emitter.emit(BoltEvent::PairingStatus(BoltPairingStatus {
+                        emitter.emit(Event::PairingStatus {
                             device_address: payload[2..=7].try_into().unwrap(),
                             pairing_error: error,
                             slot: if payload[8] == 0x00 {
@@ -206,7 +201,7 @@ impl BoltReceiver {
                             } else {
                                 Some(payload[8])
                             },
-                        }));
+                        });
                     },
                     // Passkey request
                     0x4d => {
@@ -214,42 +209,74 @@ impl BoltReceiver {
                             return;
                         };
 
-                        emitter.emit(BoltEvent::PairingPasskeyRequest(
-                            BoltPairingPasskeyRequest {
-                                device_address: payload[7..=12].try_into().unwrap(),
-                                passkey: passkey.to_string(),
-                            },
-                        ));
+                        emitter.emit(Event::PairingPasskeyRequest {
+                            device_address: payload[7..=12].try_into().unwrap(),
+                            passkey: passkey.to_string(),
+                        });
                     },
                     // Passkey pressed
                     0x4e => {
-                        let Ok(press_type) = BoltPairingPasskeyPressType::try_from(payload[0])
-                        else {
+                        let Ok(press_type) = PairingPasskeyPressType::try_from(payload[0]) else {
                             return;
                         };
 
-                        emitter.emit(BoltEvent::PairingPasskeyPressed(
-                            BoltPairingPasskeyPressed {
-                                device_address: payload[1..=6].try_into().unwrap(),
-                                press_type,
-                            },
-                        ));
+                        emitter.emit(Event::PairingPasskeyPressed {
+                            device_address: payload[1..=6].try_into().unwrap(),
+                            press_type,
+                        });
                     },
                     _ => (),
                 }
             }
         });
 
-        Ok(BoltReceiver {
+        Ok(Receiver {
             chan,
             emitter,
             msg_listener_hdl: hdl,
         })
     }
 
-    /// Creates a new listener for receiving Bolt receiver events.
-    pub fn listen(&self) -> async_channel::Receiver<BoltEvent> {
+    /// Creates a new listener for receiving receiver events.
+    pub fn listen(&self) -> async_channel::Receiver<Event> {
         self.emitter.create_receiver()
+    }
+
+    /// Queries the current information about what notifications are enabled.
+    pub async fn get_notification_state(&self) -> Result<NotificationState, ReceiverError> {
+        let response = self
+            .chan
+            .read_register(
+                RECEIVER_DEVICE_INDEX,
+                Register::Notifications.into(),
+                [0u8; 3],
+            )
+            .await?;
+
+        Ok(NotificationState {
+            wireless_notifications: (response[1] & 1) != 0,
+        })
+    }
+
+    /// Configures what notifications are enabled and thus reported by the
+    /// receiver.
+    pub async fn set_notification_state(
+        &self,
+        state: NotificationState,
+    ) -> Result<(), ReceiverError> {
+        self.chan
+            .write_register(RECEIVER_DEVICE_INDEX, Register::Notifications.into(), [
+                0,
+                if state.wireless_notifications {
+                    1
+                } else {
+                    0
+                },
+                0,
+            ])
+            .await?;
+
+        Ok(())
     }
 
     /// Counts the amount of devices currently paired to this receiver. The
@@ -260,7 +287,7 @@ impl BoltReceiver {
             .chan
             .read_register(
                 RECEIVER_DEVICE_INDEX,
-                BoltRegister::Connections.into(),
+                Register::Connections.into(),
                 [0u8; 3],
             )
             .await?;
@@ -270,9 +297,12 @@ impl BoltReceiver {
 
     /// Triggers device arrival notifications for all devices currently
     /// connected to the receiver. This is useful for device enumeration.
+    ///
+    /// Check [`Self::get_notification_state`] first to make sure that
+    /// [`NotificationState::wireless_notifications`] is enabled.
     pub async fn trigger_device_arrival(&self) -> Result<(), ReceiverError> {
         self.chan
-            .write_register(RECEIVER_DEVICE_INDEX, BoltRegister::Connections.into(), [
+            .write_register(RECEIVER_DEVICE_INDEX, Register::Connections.into(), [
                 0x02, 0x00, 0x00,
             ])
             .await?;
@@ -282,8 +312,11 @@ impl BoltReceiver {
 
     /// Collects information about all paired devices by calling
     /// [`Self::trigger_device_arrival`] and collecting incoming
-    /// [`BoltEvent::DeviceConnection`] events.
-    pub async fn collect_paired_devices(&self) -> Result<Vec<BoltDeviceConnection>, ReceiverError> {
+    /// [`Event::DeviceConnection`] events.
+    ///
+    /// Check [`Self::get_notification_state`] first to make sure that
+    /// [`NotificationState::wireless_notifications`] is enabled.
+    pub async fn collect_paired_devices(&self) -> Result<Vec<DeviceConnection>, ReceiverError> {
         // The idea here is that, when triggering fake device arrival notifications, the
         // receiver will send the register write confirmation message only AFTER sending
         // all arrival notifications.
@@ -300,7 +333,7 @@ impl BoltReceiver {
             select! {
                 _ = fin => break,
                 res = rx.recv().fuse() => {
-                    let Ok(BoltEvent::DeviceConnection(connection)) = res else {
+                    let Ok(Event::DeviceConnection(connection)) = res else {
                         continue;
                     };
 
@@ -312,15 +345,12 @@ impl BoltReceiver {
         Ok(devices)
     }
 
-    /// Provides the unique ID of the receiver.
+    /// Retrieves the unique ID of the receiver. This is not the same as the
+    /// serial number.
     pub async fn get_unique_id(&self) -> Result<String, ReceiverError> {
         let response = self
             .chan
-            .read_long_register(
-                RECEIVER_DEVICE_INDEX,
-                BoltRegister::UniqueId.into(),
-                [0u8; 3],
-            )
+            .read_long_register(RECEIVER_DEVICE_INDEX, Register::UniqueId.into(), [0u8; 3])
             .await?;
 
         // When decoding the last 8 bytes of the response to their ASCII representation
@@ -337,23 +367,24 @@ impl BoltReceiver {
             .to_string())
     }
 
-    /// Provides the pairing information of a specific paired device.
+    /// Provides the pairing information of a specific paired device by its
+    /// index.
     pub async fn get_device_pairing_information(
         &self,
         device_index: u8,
-    ) -> Result<BoltDevicePairingInformation, ReceiverError> {
+    ) -> Result<DevicePairingInformation, ReceiverError> {
         let response = self
             .chan
-            .read_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::ReceiverInfo.into(), [
-                u8::from(BoltInfoSubRegister::DevicePairingInformation) + (device_index & 0x0f),
+            .read_long_register(RECEIVER_DEVICE_INDEX, Register::ReceiverInfo.into(), [
+                u8::from(InfoSubRegister::DevicePairingInformation) + (device_index & 0x0f),
                 0x00,
                 0x00,
             ])
             .await?;
 
-        Ok(BoltDevicePairingInformation {
+        Ok(DevicePairingInformation {
             wpid: u16::from_le_bytes(response[2..=3].try_into().unwrap()),
-            kind: BoltDeviceKind::try_from(response[1] & 0x0f)
+            kind: DeviceKind::try_from(response[1] & 0x0f)
                 .map_err(|_| Hidpp10Error::UnsupportedResponse)?,
             encrypted: response[1] & (1 << 5) != 0,
             online: response[1] & (1 << 6) == 0,
@@ -361,7 +392,7 @@ impl BoltReceiver {
         })
     }
 
-    /// Provides the codename of a specific paired device.
+    /// Provides the codename of a specific paired device by its index.
     pub async fn get_device_codename(&self, device_index: u8) -> Result<String, ReceiverError> {
         // For device names longer than 13 characters this may need to be called
         // multiple times with different parameters. I don't have a device with
@@ -369,8 +400,8 @@ impl BoltReceiver {
 
         let response = self
             .chan
-            .read_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::ReceiverInfo.into(), [
-                u8::from(BoltInfoSubRegister::DeviceCodename) + (device_index & 0x0f),
+            .read_long_register(RECEIVER_DEVICE_INDEX, Register::ReceiverInfo.into(), [
+                u8::from(InfoSubRegister::DeviceCodename) + (device_index & 0x0f),
                 0x01,
                 0x00,
             ])
@@ -389,7 +420,7 @@ impl BoltReceiver {
         payload[1] = device_index;
 
         self.chan
-            .write_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::Pairing.into(), payload)
+            .write_long_register(RECEIVER_DEVICE_INDEX, Register::Pairing.into(), payload)
             .await?;
 
         Ok(())
@@ -398,12 +429,12 @@ impl BoltReceiver {
     /// Starts the pairing process for a new device.
     ///
     /// The required `address` and `authentication` values are usually
-    /// discovered from the [`BoltEvent::DeviceDiscoveryDeviceDetails`]
-    /// event which is emitted regularly when actively discovering available
-    /// devices ([`Self::discover_devices`]).
+    /// discovered from the [`Event::DeviceDiscoveryDeviceDetails`] event which
+    /// is emitted regularly when actively discovering available devices
+    /// ([`Self::discover_devices`]).
     ///
     /// `entropy` specifies how complex the authentication passkey should be.
-    /// For mice this defines the amount of keypresses (left or right) the user
+    /// For mice, this defines the amount of keypresses (left or right) the user
     /// has to perform. Not all values seem to be supported.
     pub async fn pair_device(
         &self,
@@ -420,26 +451,26 @@ impl BoltReceiver {
         payload[9] = entropy;
 
         self.chan
-            .write_long_register(RECEIVER_DEVICE_INDEX, BoltRegister::Pairing.into(), payload)
+            .write_long_register(RECEIVER_DEVICE_INDEX, Register::Pairing.into(), payload)
             .await?;
 
         Ok(())
     }
 
-    /// Starts device discovery for `timeout` ([`None`] = default, seems to be
-    /// 30s) seconds. The maximum supported value is 60s.
+    /// Starts device discovery for `timeout` seconds ([`None`] = default, seems
+    /// to be 30s). The maximum supported value is 60s.
     ///
     /// While device discovery is enabled,
-    /// [`BoltEvent::DeviceDiscoveryDeviceDetails`] and
-    /// [`BoltEvent::DeviceDiscoveryDeviceName`] events are emitted for every
+    /// [`Event::DeviceDiscoveryDeviceDetails`] and
+    /// [`Event::DeviceDiscoveryDeviceName`] events are emitted for every
     /// discovered device.
     pub async fn discover_devices(&self, timeout: Option<u8>) -> Result<(), ReceiverError> {
         self.chan
-            .write_register(
-                RECEIVER_DEVICE_INDEX,
-                BoltRegister::DeviceDiscovery.into(),
-                [timeout.unwrap_or(0x00), 0x01, 0x00],
-            )
+            .write_register(RECEIVER_DEVICE_INDEX, Register::DeviceDiscovery.into(), [
+                timeout.unwrap_or(0x00),
+                0x01,
+                0x00,
+            ])
             .await?;
 
         Ok(())
@@ -448,51 +479,53 @@ impl BoltReceiver {
     /// Cancels the device discovery process.
     pub async fn cancel_device_discovery(&self) -> Result<(), ReceiverError> {
         self.chan
-            .write_register(
-                RECEIVER_DEVICE_INDEX,
-                BoltRegister::DeviceDiscovery.into(),
-                [0x00, 0x02, 0x00],
-            )
+            .write_register(RECEIVER_DEVICE_INDEX, Register::DeviceDiscovery.into(), [
+                0x00, 0x02, 0x00,
+            ])
             .await?;
 
         Ok(())
     }
 }
 
-impl Drop for BoltReceiver {
+impl Drop for Receiver {
     fn drop(&mut self) {
         self.chan.remove_msg_listener(self.msg_listener_hdl);
     }
 }
 
-/// Represents some information about a specific device pairing as returned by
-/// [`BoltReceiver::get_device_pairing_information`].
+/// Indicates which notifications are enabled and thus sent by the receiver.
+///
+/// This information can be queried using [`Receiver::get_notification_state`].
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Builder)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+pub struct NotificationState {
+    /// Whether the receiver sends device arrival/removal notifications.
+    pub wireless_notifications: bool,
+}
+
+/// Represents information about a paired device.
+///
+/// This information can be queried using
+/// [`Receiver::get_device_pairing_information`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
-pub struct BoltDevicePairingInformation {
-    /// The wireless product ID of the device.
+pub struct DevicePairingInformation {
     pub wpid: u16,
-
-    /// The kind of the device.
-    pub kind: BoltDeviceKind,
-
-    /// Whether the link to the device is encrypted.
+    pub kind: DeviceKind,
     pub encrypted: bool,
-
-    /// Whether the device is online/reachable.
     pub online: bool,
-
-    /// The unit ID of the device.
     pub unit_id: [u8; 4],
 }
 
-/// Represents the kind of a device paired with a Bolt receiver.
+/// Represents the kind of a device paired to a Bolt receiver.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, IntoPrimitive, TryFromPrimitive)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
-pub enum BoltDeviceKind {
+pub enum DeviceKind {
     Unknown = 0x00,
     Keyboard = 0x01,
     Mouse = 0x02,
@@ -507,196 +540,157 @@ pub enum BoltDeviceKind {
     Headset = 0x0d,
 }
 
-/// Represents an event emitted by a Bolt receiver.
+/// Represents an event emitted by the receiver.
+///
+/// You can listen to these events using [`Receiver::listen`]. Only enabled
+/// notifications as indicated by [`Receiver::get_notification_state`] are
+/// emitted.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
-pub enum BoltEvent {
+pub enum Event {
     /// Is emitted whenever a device connects to or disconnects from the
-    /// receiver.
+    /// receiver, but only if [`NotificationState::wireless_notifications`] is
+    /// enabled.
     ///
     /// Can be triggered for all paired devices using
-    /// [`BoltReceiver::trigger_device_arrival`] to allow easy device
-    /// enumeration.
-    DeviceConnection(BoltDeviceConnection),
+    /// [`Receiver::trigger_device_arrival`] to allow easy device enumeration.
+    ///
+    /// [`Receiver::collect_paired_devices`] implements a simple mechanism to
+    /// collect all paired devices.
+    DeviceConnection(DeviceConnection),
 
     /// Is emitted whenever the device discovery status changes.
-    DeviceDiscoveryStatus(BoltDeviceDiscoveryStatus),
+    DeviceDiscoveryStatus {
+        discovery_enabled: bool,
+    },
 
     /// Is emitted many times for every device discovered using
-    /// [`BoltReceiver::discover_devices`].
+    /// [`Receiver::discover_devices`].
     ///
     /// This event contains device details, including its address required to
-    /// start pairing. The [`BoltEvent::DeviceDiscoveryDeviceName`] event will
-    /// also be emitted and contains the device name.
-    DeviceDiscoveryDeviceDetails(BoltDeviceDiscoveryDeviceDetails),
+    /// start pairing. The [`Event::DeviceDiscoveryDeviceName`] event will also
+    /// be emitted and contains the device name.
+    DeviceDiscoveryDeviceDetails {
+        /// The incrementing event counter. This can be used to map
+        /// [`Event::DeviceDiscoveryDeviceDetails`] and
+        /// [`Event::DeviceDiscoveryDeviceName`] events.
+        counter: u16,
+
+        kind: DeviceKind,
+        wpid: u16,
+
+        /// The address of the device required to pair it using
+        /// [`Receiver::pair_device`].
+        ///
+        /// This can also be used as the unique device identifier when
+        /// collecting discovered devices.
+        address: [u8; 6],
+
+        /// The authentication type(s) the device supports. Unfortunately, there
+        /// is not much information about this value and whether it is a
+        /// single value or a bitfield.
+        authentication: u8,
+    },
 
     /// Is emitted many times for every device discovered using
-    /// [`BoltReceiver::discover_devices`].
+    /// [`Receiver::discover_devices`].
     ///
     /// This event only contains the device name. Device details will be
-    /// provided using the [`BoltEvent::DeviceDiscoveryDeviceDetails`] event.
-    DeviceDiscoveryDeviceName(BoltDeviceDiscoveryDeviceName),
+    /// provided using the [`Event::DeviceDiscoveryDeviceDetails`] event.
+    DeviceDiscoveryDeviceName {
+        /// The incrementing event counter. This can be used to map
+        /// [`Event::DeviceDiscoveryDeviceDetails`] and
+        /// [`Event::DeviceDiscoveryDeviceName`] events.
+        counter: u16,
+
+        name: String,
+    },
 
     /// Is emitted whenever the status of a pairing process changes.
-    PairingStatus(BoltPairingStatus),
+    PairingStatus {
+        device_address: [u8; 6],
+        pairing_error: Option<PairingError>,
+
+        /// The receiver slot the newly paired device was paired to. This can be
+        /// used as the device index for subsequent operations.
+        slot: Option<u8>,
+    },
 
     /// Is emitted once the receiver requests a passkey to be entered on a
     /// device that should be paired to it.
-    PairingPasskeyRequest(BoltPairingPasskeyRequest),
+    PairingPasskeyRequest {
+        device_address: [u8; 6],
+
+        /// The passkey the user has to enter in order to pair the device.
+        ///
+        /// Depending on the device and authentication type, this value has
+        /// different implications.
+        ///
+        /// For mice, this value will be a valid 6-digit number. After parsing
+        /// this into an integer, the (least significant) bits represent
+        /// the sequence of mouse presses (`0` = left, `1` = right) the
+        /// user has to perform, with an additional press of both mouse
+        /// buttons simultaneously.
+        ///
+        /// The amount of bits significant to this equals to the `entropy`
+        /// passed to [`Receiver::pair_device`].
+        passkey: String,
+    },
 
     /// Is emitted for every keypress a user performs while entering a pairing
     /// passkey.
-    PairingPasskeyPressed(BoltPairingPasskeyPressed),
+    PairingPasskeyPressed {
+        device_address: [u8; 6],
+
+        /// The type of the keypress the user performed.
+        ///
+        /// Every passkey sequence starts with an event where this value is set
+        /// to [`PairingPasskeyPressType::Initialization`]. Each time the user
+        /// presses a key, an event with a press type of
+        /// [`PairingPasskeyPressType::Keypress`] is emitted. Once the user
+        /// submits their passkey, this value will be
+        /// [`PairingPasskeyPressType::Submit`].
+        press_type: PairingPasskeyPressType,
+    },
 }
 
-/// Represents the data of the [`BoltEvent::DeviceConnection`] event.
+/// Represents a device connected to a Bolt receiver.
+///
+/// This information is emitted by the [`Event::DeviceConnection`] event and can
+/// be conveniently collected using [`Receiver::collect_paired_devices`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
-pub struct BoltDeviceConnection {
-    /// The index of the device used to communicate with it.
+pub struct DeviceConnection {
     pub index: u8,
-
-    /// The kind of the device.
-    pub kind: BoltDeviceKind,
-
-    /// Whether the link to the device is encrypted.
+    pub kind: DeviceKind,
     pub encrypted: bool,
-
-    /// Whether the device is online/reachable.
     pub online: bool,
-
-    /// The wireless product ID of the device.
     pub wpid: u16,
 }
 
-/// Represents the data of the [`BoltEvent::DeviceDiscoveryStatus`] event.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[non_exhaustive]
-pub struct BoltDeviceDiscoveryStatus {
-    /// Whether device discovery is enabled.
-    pub discovery_enabled: bool,
-}
-
-/// Represents the data of the [`BoltEvent::DeviceDiscoveryDeviceDetails`]
-/// event.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[non_exhaustive]
-pub struct BoltDeviceDiscoveryDeviceDetails {
-    /// The incrementing event counter. This can be used to map
-    /// [`BoltEvent::DeviceDiscoveryDeviceDetails`] and
-    /// [`BoltEvent::DeviceDiscoveryDeviceName`] events.
-    pub counter: u16,
-
-    /// The kind of the discovered device.
-    pub kind: BoltDeviceKind,
-
-    /// The wireless product ID of the device.
-    pub wpid: u16,
-
-    /// The address of the device required to pair it using
-    /// [`BoltReceiver::pair_device`].
-    ///
-    /// This can also be used as the unique device identifier when collecting
-    /// discovered devices.
-    pub address: [u8; 6],
-
-    /// The authentication type(s) the device supports. Unfortunately, there is
-    /// not much information about this value and whether it is a single value
-    /// or a bitfield.
-    pub authentication: u8,
-}
-
-/// Represents the data of the [`BoltEvent::DeviceDiscoveryDeviceName`] event.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[non_exhaustive]
-pub struct BoltDeviceDiscoveryDeviceName {
-    /// The incrementing event counter. This can be used to map
-    /// [`BoltEvent::DeviceDiscoveryDeviceDetails`] and
-    /// [`BoltEvent::DeviceDiscoveryDeviceName`] events.
-    pub counter: u16,
-
-    /// The name of the discovered device.
-    pub name: String,
-}
-
-/// Represents the data of the [`BoltEvent::PairingStatus`] event.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[non_exhaustive]
-pub struct BoltPairingStatus {
-    /// The address of the device,
-    pub device_address: [u8; 6],
-
-    /// The error that occurred while trying to pair the device.
-    pub pairing_error: Option<BoltPairingError>,
-
-    /// The slot of the newly paired device.
-    pub slot: Option<u8>,
-}
-
-/// Represents an error that occurred while pairing a device.
+/// Represents an error during device pairing.
+///
+/// This is reported by the [`Event::PairingStatus`] event.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, TryFromPrimitive, IntoPrimitive)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
-pub enum BoltPairingError {
+pub enum PairingError {
     DeviceTimeout = 0x01,
     Failed = 0x02,
 }
 
-/// Represents the data of the [`BoltEvent::PairingPasskeyRequest`] event.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[non_exhaustive]
-pub struct BoltPairingPasskeyRequest {
-    /// The address of the device.
-    pub device_address: [u8; 6],
-
-    /// The passkey the user has to enter in order to pair the device.
-    ///
-    /// Depending on the device and authentication type, this value has
-    /// different implications.
-    ///
-    /// For mice, this value will be a valid 6-digit number. After parsing this
-    /// into an integer, the (least significant) bits represent the sequence
-    /// of mouse presses (`0` = left, `1` = right) the user has to perform,
-    /// with an additional press of both mouse buttons simultaneously.\
-    /// The amount of bits significant to this equals to the `entropy` passed to
-    /// [`BoltReceiver::pair_device`].
-    pub passkey: String,
-}
-
-/// Represents the data of the [`BoltEvent::PairingPasskeyPressed`] event.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[non_exhaustive]
-pub struct BoltPairingPasskeyPressed {
-    /// The address of the device.
-    pub device_address: [u8; 6],
-
-    /// The type of the keypress the user performed.
-    ///
-    /// Every passkey sequence starts with an event where this value is set to
-    /// [`BoltPairingPasskeyPressType::Initialization`]. Each time the user
-    /// presses a key, an event with a press type of
-    /// [`BoltPairingPasskeyPressType::Keypress`] is emitted. Once the user
-    /// submits their passkey, this value will be
-    /// [`BoltPairingPasskeyPressType::Submit`].
-    pub press_type: BoltPairingPasskeyPressType,
-}
-
-/// The type of a passkey keypress as included in the
-/// [`BoltPairingPasskeyPressed`] event data.
+/// Represents the type of a single passkey press.
+///
+/// This is reported by the [`Event::PairingPasskeyPressed`] event, which also
+/// includes some further information about the context of these values.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, TryFromPrimitive, IntoPrimitive)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[repr(u8)]
-pub enum BoltPairingPasskeyPressType {
+pub enum PairingPasskeyPressType {
     Initialization = 0x00,
     Keypress = 0x01,
     Submit = 0x04,

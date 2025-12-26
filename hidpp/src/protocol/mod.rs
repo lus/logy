@@ -77,16 +77,15 @@ pub async fn determine_version(
 
             // We only care about HID++1.0 error messages, which are always short according
             // to the spec.
-            if let v10::Message::Short(header, payload) = v10::Message::from(*resp) {
-                if header.device_index == device_index
+            if let v10::Message::Short(header, payload) = v10::Message::from(*resp)
+                && header.device_index == device_index
                     && header.sub_id == v10::MessageType::Error.into()
                     // The feature index we sent would be interpreted as the sub ID by HID++1.0, which is included in the error message.
                     && payload[0] == 0x00
                     // The function & software IDs would be interpreted as the register address in HID++1.0.
                     && payload[1] == nibble::combine(msg.header().function_id, sw_id)
-                {
-                    return true;
-                }
+            {
+                return true;
             }
 
             false

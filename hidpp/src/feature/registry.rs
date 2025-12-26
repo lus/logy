@@ -30,7 +30,7 @@ pub type FeatureImplProducer =
 
 /// Represents a known feature implementation starting from a specific feature
 /// version.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct FeatureVersion {
     /// The minimum feature version the implementation supports.
     pub starting_version: u8,
@@ -40,7 +40,7 @@ pub struct FeatureVersion {
 }
 
 /// Represents a known HID++2.0 device feature.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct KnownFeature {
     /// The name of the feature.
     /// This is usually a slightly modified version of the name found in

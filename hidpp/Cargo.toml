@@ -1,6 +1,6 @@
 [package]
 name = "hidpp"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "An implementation of the HID++ protocol used by Logitech devices"
 license-file = "../LICENSE"
@@ -18,3 +18,5 @@ lazy_static = "1.5.0"
 num_enum = "0.7.3"
 async-channel = "2.3.1"
 serde = { version = "1.0", features = ["derive"], optional = true }
+hex = "0.4.3"
+derive_builder = "0.20.2"

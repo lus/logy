@@ -1,7 +1,7 @@
 use anyhow::Result;
 use hidpp::receiver::{
     Receiver,
-    bolt::{BoltDeviceConnection, BoltDeviceKind},
+    bolt::{DeviceConnection, DeviceKind},
 };
 use itertools::Itertools;
 use serde::Serialize;
@@ -40,8 +40,8 @@ pub struct PairedDevice {
     pub wpid: u16,
 }
 
-impl From<BoltDeviceConnection> for PairedDevice {
-    fn from(value: BoltDeviceConnection) -> Self {
+impl From<DeviceConnection> for PairedDevice {
+    fn from(value: DeviceConnection) -> Self {
         Self {
             slot: value.index,
             kind: value.kind.into(),
@@ -67,21 +67,21 @@ pub enum PairedDeviceKind {
     Headset,
 }
 
-impl From<BoltDeviceKind> for PairedDeviceKind {
-    fn from(value: BoltDeviceKind) -> Self {
+impl From<DeviceKind> for PairedDeviceKind {
+    fn from(value: DeviceKind) -> Self {
         match value {
-            BoltDeviceKind::Unknown => Self::Unknown,
-            BoltDeviceKind::Keyboard => Self::Keyboard,
-            BoltDeviceKind::Mouse => Self::Mouse,
-            BoltDeviceKind::Numpad => Self::Numpad,
-            BoltDeviceKind::Presenter => Self::Presenter,
-            BoltDeviceKind::Remote => Self::Remote,
-            BoltDeviceKind::Trackball => Self::Trackball,
-            BoltDeviceKind::Touchpad => Self::Touchpad,
-            BoltDeviceKind::Tablet => Self::Tablet,
-            BoltDeviceKind::Gamepad => Self::Gamepad,
-            BoltDeviceKind::Joystick => Self::Joystick,
-            BoltDeviceKind::Headset => Self::Headset,
+            DeviceKind::Unknown => Self::Unknown,
+            DeviceKind::Keyboard => Self::Keyboard,
+            DeviceKind::Mouse => Self::Mouse,
+            DeviceKind::Numpad => Self::Numpad,
+            DeviceKind::Presenter => Self::Presenter,
+            DeviceKind::Remote => Self::Remote,
+            DeviceKind::Trackball => Self::Trackball,
+            DeviceKind::Touchpad => Self::Touchpad,
+            DeviceKind::Tablet => Self::Tablet,
+            DeviceKind::Gamepad => Self::Gamepad,
+            DeviceKind::Joystick => Self::Joystick,
+            DeviceKind::Headset => Self::Headset,
             _ => Self::Unknown,
         }
     }

@@ -14,25 +14,27 @@
 
 use std::sync::Arc;
 
-use bolt::{BOLT_VPID_PAIRS, BoltReceiver};
 use thiserror::Error;
 
 use crate::{channel::HidppChannel, protocol::v10::Hidpp10Error};
 
 pub mod bolt;
+pub mod unifying;
 
 /// The index to use when communicating with the receiver on any HID++ channel.
 pub const RECEIVER_DEVICE_INDEX: u8 = 0xff;
 
 /// Tries to detect the receiver present on a HID++ channel.
 pub fn detect(chan: Arc<HidppChannel>) -> Option<Receiver> {
-    if BOLT_VPID_PAIRS.contains(&(chan.vendor_id, chan.product_id)) {
-        if let Ok(bolt) = BoltReceiver::new(chan) {
-            return Some(Receiver::Bolt(bolt));
-        }
-        return None;
+    let vpid_pair = &(chan.vendor_id, chan.product_id);
+
+    if bolt::VPID_PAIRS.contains(vpid_pair) {
+        return bolt::Receiver::new(chan).ok().map(Receiver::Bolt);
     }
 
+    if unifying::VPID_PAIRS.contains(vpid_pair) {
+        return unifying::Receiver::new(chan).ok().map(Receiver::Unifying);
+    }
     None
 }
 
@@ -40,7 +42,8 @@ pub fn detect(chan: Arc<HidppChannel>) -> Option<Receiver> {
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum Receiver {
-    Bolt(BoltReceiver),
+    Bolt(bolt::Receiver),
+    Unifying(unifying::Receiver),
 }
 
 impl Receiver {
@@ -48,6 +51,7 @@ impl Receiver {
     pub fn name(&self) -> String {
         match self {
             Self::Bolt(_) => "Logi Bolt Receiver",
+            Self::Unifying(_) => "Unifying Receiver",
         }
         .to_string()
     }
@@ -59,6 +63,7 @@ impl Receiver {
     pub async fn get_unique_id(&self) -> Result<String, ReceiverError> {
         match self {
             Self::Bolt(bolt) => bolt.get_unique_id().await,
+            Self::Unifying(unifying) => unifying.get_receiver_info().await.map(|x| x.serial_number),
         }
     }
 }

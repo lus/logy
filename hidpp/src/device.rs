@@ -128,7 +128,7 @@ impl Device {
     ///
     /// Returns a vector containing all feature IDs supported by the device.
     ///
-    /// Returns `Ok(None)` if the [`FeatureSetFeatureV0`] feature, which is
+    /// Returns `Ok(None)` if the [`FeatureSetFeature`] feature, which is
     /// required for feature enumeration, is not supported by the device.
     pub async fn enumerate_features(
         &mut self,

@@ -58,7 +58,7 @@
 //!    nibble::U4,
 //!    receiver::{self, Receiver, bolt::BoltEvent},
 //! };
-
+//!
 //! // First, we will create the HID++ channel.
 //! // This function will return `ChannelError::HidppNotSupported`
 //! // if the passed HID channel does not support HID++.
@@ -102,7 +102,7 @@
 //!     .expect("could not trigger device arrival notification");
 //!
 //! // Let's say we found a device with the index 0x02 using this enumeration.
-//! We // can now initialize it:
+//! We can now initialize it:
 //! let mut device = Device::new(Arc::clone(&channel), 0x02)
 //!     .await
 //!     .expect("could not initialize device");
@@ -125,7 +125,7 @@
 //!     .expect("FeatureSet feature is not supported");
 //!
 //! // As there are a lot of possible features and a given device only supports
-//! a // small subset of these, looking up every single feature ID using this
+//! // a small subset of these, looking up every single feature ID using this
 //! // technique is not practicable. That's why the `IFeatureSet` feature can be
 //! // used to enumerate over all supported features, but only if this feature
 //! // itself is supported by the device.
@@ -139,8 +139,8 @@
 //! // registry in the `hidpp::feature::registry` module maintains a list of all
 //! // known features and, if provided, a link to its implementation. The
 //! // `enumerate_features` function we just called automatically registers
-//! these // implementations for our device and we can now access them like
-//! this: let thumbwheel = device
+//! // these implementations for our device and we can now access them like this:
+//! let thumbwheel = device
 //!     .get_feature::<ThumbwheelFeatureV0>()
 //!     .expect("Thumbwheel feature is not supported");
 //! thumbwheel
@@ -148,8 +148,6 @@
 //!     .await
 //!     .expect("could not divert thumbwheel");
 //! ```
-//! 
-//! That should cover the basic use case of this crate.
 
 pub use async_trait::async_trait;
 
