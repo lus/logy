@@ -237,6 +237,14 @@ lazy_static! {
             name: "Illumination",
             versions: &[]
         }),
+        (0x19b0, KnownFeature {
+            name: "HapticFeedback",
+            versions: &[]
+        }),
+        (0x19c0, KnownFeature {
+            name: "ForceSensingButton",
+            versions: &[]
+        }),
         (0x1a00, KnownFeature {
             name: "PresenterControl",
             versions: &[]
